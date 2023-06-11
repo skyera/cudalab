@@ -390,3 +390,32 @@ TEST_CASE("getdevice") {
     REQUIRE(e == cudaSuccess);
     std::cout << "dev " << dev << "\n";
 }
+
+void print_devprop(const cudaDeviceProp& devprop) {
+    std::cout << "name: " << devprop.name << "\n"
+        << "ECCEnabled: " << devprop.ECCEnabled << "\n"
+        << "clockRate: " << devprop.clockRate << "\n"
+        << "l2CacheSize: " << devprop.l2CacheSize << "\n";
+}
+
+TEST_CASE("devprop") {
+    int dev = 0;
+    cudaDeviceProp devprop;
+
+    cudaError_t e = cudaGetDeviceProperties(&devprop, dev);
+    REQUIRE(e == cudaSuccess);
+    print_devprop(devprop);
+}
+
+TEST_CASE("allochost") {
+    int n = 16 * 1024 * 1024;
+    int nbytes = n * sizeof(int);
+    int *a = 0;
+
+    cudaError_t e = cudaMallocHost((void**)&a, nbytes);
+    REQUIRE(e == cudaSuccess);
+    memset(a, 0, nbytes);
+
+    e = cudaFreeHost(a);
+    REQUIRE(e == cudaSuccess);
+}
