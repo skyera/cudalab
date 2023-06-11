@@ -1,1 +1,3 @@
-nvcc -g -G -o mycuda  mycuda.cu
+
+mycuda: mucuda.cu
+	nvcc -g -G -o mycuda  mycuda.cu
