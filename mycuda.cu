@@ -407,7 +407,13 @@ TEST_CASE("devprop") {
     print_devprop(devprop);
 }
 
-TEST_CASE("allochost") {
+__global__ void increment_kernel(int *g_data, int inc_value)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    g_data[idx] = g_data[idx] + inc_value;
+}
+
+TEST_CASE("asyncAPI") {
     int n = 16 * 1024 * 1024;
     int nbytes = n * sizeof(int);
     int *a = 0;
@@ -416,6 +422,30 @@ TEST_CASE("allochost") {
     REQUIRE(e == cudaSuccess);
     memset(a, 0, nbytes);
 
+    int *d_a = 0;
+    e = cudaMalloc((void**)&d_a, nbytes);
+    REQUIRE(e == cudaSuccess);
+    e = cudaMemset(d_a, 255, nbytes);
+    REQUIRE(e == cudaSuccess);
+
+    // event
+    cudaEvent_t start, stop;
+    e = cudaEventCreate(&start);
+    REQUIRE(e == cudaSuccess);
+    e = cudaEventCreate(&stop);
+    REQUIRE(e == cudaSuccess);
+    
+    cudaMemcpyAsync(d_a, a, nbytes, cudaMemcpyHostToDevice, 0);
+
+    dim3 threads = dim3(512, 1);
+    dim3 blocks = dim3(n / threads.x, 1);
+    int value = 26;
+    
+    increment_kernel<<<blocks, threads, 0, 0>>>(d_a, value);
+    cudaMemcpyAsync(a, d_a, nbytes, cudaMemcpyDeviceToHost, 0);
+
     e = cudaFreeHost(a);
+    REQUIRE(e == cudaSuccess);
+    e = cudaFree(d_a);
     REQUIRE(e == cudaSuccess);
 }
