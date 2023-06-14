@@ -434,6 +434,9 @@ TEST_CASE("asyncAPI") {
     REQUIRE(e == cudaSuccess);
     e = cudaEventCreate(&stop);
     REQUIRE(e == cudaSuccess);
+
+    e = cudaDeviceSynchronize();
+    REQUIRE(e == cudaSuccess);
     
     cudaMemcpyAsync(d_a, a, nbytes, cudaMemcpyHostToDevice, 0);
 
