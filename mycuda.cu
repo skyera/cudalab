@@ -367,6 +367,39 @@ TEST_CASE("compute_mode") {
     std::cout << "compute mode: " << compute_mode << "\n";
 }
 
+const char* get_arch_name(int major, int minor) {
+    typedef struct {
+        int sm;
+        const char* name;
+    } ArchName;
+
+    ArchName arch_names[] = {
+      {0x30, "Kepler"},
+      {0x32, "Kepler"},
+      {0x35, "Kepler"},
+      {0x37, "Kepler"},
+      {0x50, "Maxwell"},
+      {0x52, "Maxwell"},
+      {0x53, "Maxwell"},
+      {0x60, "Pascal"},
+      {0x61, "Pascal"},
+      {0x62, "Pascal"},
+      {0x70, "Volta"},
+      {0x72, "Xavier"},
+      {0x75, "Turing"},
+      {-1, "Graphics Device"}};
+        
+    int i;
+    for (i = 0; arch_names[i].sm != -1; ++i) {
+        if (arch_names[i].sm == ((major << 4) + minor)) {
+            return arch_names[i].name;
+        }
+    }
+
+    printf("dev %d.%d is undefined\n", major, minor);
+    return arch_names[i].name;
+}
+
 TEST_CASE("major_minor") {
     int major = 0;
     int minor = 0;
@@ -381,6 +414,9 @@ TEST_CASE("major_minor") {
             curr_dev);
     REQUIRE(e == cudaSuccess);
     std::cout << "minor: " << minor << "\n";
+    
+    const char* name = get_arch_name(major, minor);
+    std::cout << name << "\n";
 }
 
 TEST_CASE("getdevice") {
