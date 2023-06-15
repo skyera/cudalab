@@ -417,6 +417,9 @@ TEST_CASE("major_minor") {
     
     const char* name = get_arch_name(major, minor);
     std::cout << name << "\n";
+
+    auto err = cudaGetLastError();
+    std::cout << "last cuda error: " << err << "\n";
 }
 
 TEST_CASE("getdevice") {
