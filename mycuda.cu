@@ -491,3 +491,93 @@ TEST_CASE("asyncAPI") {
     e = cudaFree(d_a);
     REQUIRE(e == cudaSuccess);
 }
+
+__device__ double atomic_add(double* address, double val)
+{
+    unsigned long long int* address_as_ull =
+        (unsigned long long int*) address;
+    unsigned long long int old = *address_as_ull, assumed;
+
+    do {
+        assumed = old;
+        old = atomicCAS(address_as_ull, assumed,
+                        __double_as_longlong(val +
+                        __longlong_as_double(assumed)));
+    } while (assumed != old);
+
+    return __longlong_as_double(old);
+}
+
+__device__ void print_info(int depth, int thread, int uid, int parent_uid)
+{
+    if (threadIdx.x == 0) {
+        if (depth == 0) {
+            printf("BLOCK %d launched by the host\n", uid);
+        } else {
+            char buffer[32];
+
+            for (int i = 0; i < depth; ++i) {
+                buffer[3*i+0] = '|';
+                buffer[3*i+1] = ' ';
+                buffer[3*i+2] = ' ';
+            }
+            buffer[3*depth] = '\0';
+            printf("%sBLOCK %d launched by thread %d of block %d\n", buffer,
+                    uid, thread, parent_uid);
+        }
+    }
+    __syncthreads();
+}
+
+
+__device__ int g_uids = 0;
+
+__global__ void cdp_kernel(int max_depth, int depth, int thread,
+        int parent_uid)
+{
+    __shared__ int s_uid;
+
+    if (threadIdx.x == 0) {
+        s_uid = atomic_add((double*)&g_uids, 1);
+    }
+
+    __syncthreads();
+}
+
+TEST_CASE("cdpSimplePrint") {
+    int num_blocks = 2;
+    int sum = 2;
+    int max_depth = 2;
+
+    for (int i = 1; i < max_depth; ++i) {
+        num_blocks *= 4;
+        printf("+%d", num_blocks);
+        sum += num_blocks;
+    }
+    printf("=%d blocks are launched(%d from the GPU)\n", sum, sum-2);
+
+    cudaDeviceSetLimit(cudaLimitDevRuntimeSyncDepth, max_depth);
+}
+
+
+__device__ int g_int = 2;
+
+__global__ void run_atomicCAS(int *d_myint)
+{
+    atomicCAS(&g_int, 2, 3);
+    __syncthreads();
+    *d_myint = g_int;
+    printf("hello %d %d\n", g_int, *d_myint);
+}
+
+TEST_CASE("atomicCAS") {
+    int* d_myint;
+    int myint;
+    
+    cudaMalloc(&d_myint, sizeof(int));
+    run_atomicCAS<<<1,1>>>(d_myint);
+    cudaDeviceSynchronize();
+    
+    cudaMemcpy(&myint, d_myint, sizeof(int), cudaMemcpyDeviceToHost);
+    printf("%d\n", myint);
+}
