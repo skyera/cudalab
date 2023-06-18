@@ -542,6 +542,12 @@ __global__ void cdp_kernel(int max_depth, int depth, int thread,
     }
 
     __syncthreads();
+    print_info(depth, thread, s_uid, parent_uid);
+
+    if (++depth >= max_depth) {
+        return;
+    }
+    cdp_kernel<<<gridDim.x, blockDim.x>>>(max_depth, depth, threadIdx.x, s_uid);
 }
 
 TEST_CASE("cdpSimplePrint") {
@@ -557,6 +563,10 @@ TEST_CASE("cdpSimplePrint") {
     printf("=%d blocks are launched(%d from the GPU)\n", sum, sum-2);
 
     cudaDeviceSetLimit(cudaLimitDevRuntimeSyncDepth, max_depth);
+    cdp_kernel<<<2,2>>>(max_depth, 0, 0, -1);
+    cudaError_t e = cudaGetLastError();
+    REQUIRE(e == cudaSuccess);
+    cudaDeviceSynchronize();
 }
 
 
