@@ -12,6 +12,8 @@
 
 #define N 10000000
 #define MAX_ERR 1e-6
+#define MAX_DEPTH 16
+#define INSERTION_SORT 32
 
 void vector_add(float *out, float *a, float *b, int n) {
     for (int i = 0; i < n; i++) {
@@ -590,4 +592,88 @@ TEST_CASE("atomicCAS") {
     
     cudaMemcpy(&myint, d_myint, sizeof(int), cudaMemcpyDeviceToHost);
     printf("%d\n", myint);
+}
+
+__device__ void selection_sort(unsigned int *data, int left, int right)
+{
+    for (int i = left; i <= right; ++i) {
+        unsigned min_val = data[i];
+        int min_idx = i;
+
+        for (int j = i+1; j <= right; ++j) {
+            unsigned val_j = data[j];
+
+            if (val_j < min_val) {
+                min_idx = j;
+                min_val = val_j;
+            }
+        }
+
+        if (i != min_idx) {
+            data[min_idx] = data[i];
+            data[i] = min_val;
+        }
+    }
+}
+
+__global__ void cdp_simple_quicksort(unsigned int *data, int left, int right,
+        int depth)
+{
+    if (depth >= MAX_DEPTH || right -left <= INSERTION_SORT) {
+        selection_sort(data, left, right);
+        return;
+    }
+
+    unsigned int *lptr = data + left;
+    unsigned int *rptr = data + right;
+    unsigned int pivot = data[(left+right)/2];
+
+    while (lptr <= rptr) {
+
+    }
+}
+
+void initialize_data(unsigned int *dst, unsigned int nitems)
+{
+    srand(2047);
+
+    for (unsigned int i = 0; i < nitems; i++) {
+        dst[i] = rand() % nitems;
+    }
+}
+
+void run_qsort(unsigned int *data, unsigned int nitems)
+{
+    cudaDeviceSetLimit(cudaLimitDevRuntimeSyncDepth, MAX_DEPTH);
+    int left = 0;
+    int right = nitems - 1;
+
+}
+
+TEST_CASE("cdpSimpleQuicksort") {
+    cudaError_t e;
+    int device_count = 0;
+    
+    e = cudaGetDeviceCount(&device_count);
+    REQUIRE(e == cudaSuccess);
+    printf("device_count %d\n", device_count);
+
+    cudaDeviceProp devprop;
+    int dev = 0;
+    cudaGetDeviceProperties(&devprop, dev);
+    printf("major %d minor %d\n", devprop.major, devprop.minor);
+
+    int num_items= 128;
+    unsigned int *h_data = 0;
+    h_data = (unsigned int*) malloc(num_items * sizeof(unsigned int));
+    initialize_data(h_data, num_items);
+
+    unsigned int *d_data = 0;
+    e = cudaMalloc((void**)&d_data, num_items * sizeof(unsigned int));
+    REQUIRE(e == cudaSuccess);
+    e = cudaMemcpy(d_data, h_data, num_items * sizeof(unsigned int),
+            cudaMemcpyHostToDevice);
+    REQUIRE(e == cudaSuccess);
+    cudaFree(d_data);
+    free(h_data);
 }
