@@ -119,11 +119,10 @@ TEST_CASE("cuda_vector_add") {
 
     cudaMemcpy(out, d_out, sizeof(float) * N, cudaMemcpyDeviceToHost);
     
-    for (int i = 0; i < N; i++) {
-        INFO("i = ", i, " out=", out[i], " a=", a[i], " b=", b[i]);
-        // XXX
-        //REQUIRE(fabs(out[i] - a[i] - b[i]) < MAX_ERR);
-    }
+    /* for (int i = 0; i < N; i++) { */
+    /*     INFO("i = ", i, " out=", out[i], " a=", a[i], " b=", b[i]); */
+    /*     REQUIRE(fabs(out[i] - a[i] - b[i]) < MAX_ERR); */
+    /* } */
     printf("out[0] = %f\n", out[0]);
     printf("PASSED\n");
 
@@ -254,7 +253,7 @@ void run_add() {
     for (int i = 0; i < N; i++) {
         max_error = fmax(max_error, fabs(y[i]-3.0f));
     }
-    std::cout << "max error: " << max_error << std::endl;  
+    //std::cout << "max error: " << max_error << std::endl;  
     
     delete [] x;
     delete [] y;
@@ -288,7 +287,7 @@ void run_cuda_add()
     for (int i = 0; i < N; i++) {
         max_error = fmax(max_error, fabs(y[i]-3.0f));
     }
-    std::cout << "max error: " << max_error << std::endl;  
+    //std::cout << "max error: " << max_error << std::endl;  
     
     cudaFree(x);
     cudaFree(y);
@@ -322,7 +321,7 @@ void run_add_thread()
     for (int i = 0; i < N; i++) {
         max_error = fmax(max_error, fabs(y[i]-3.0f));
     }
-    std::cout << "max error: " << max_error << std::endl;  
+    //std::cout << "max error: " << max_error << std::endl;  
     
     cudaFree(x);
     cudaFree(y);
