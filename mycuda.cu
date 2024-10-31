@@ -705,3 +705,16 @@ TEST_CASE("vectoradd") {
     }
     REQUIRE(e == cudaSuccess);
 }
+
+TEST_CASE("clock") {
+    const int NUM_THREADS = 256;
+    float input[NUM_THREADS * 2];
+
+    for (int i = 0; i < NUM_THREADS; i++) {
+        input[i] = (float)i;
+    }
+
+    float *dinput = NULL;
+
+    cudaMalloc((void **)&dinput, sizeof(float) * NUM_THREADS * 2);
+}
