@@ -706,15 +706,74 @@ TEST_CASE("vectoradd") {
     REQUIRE(e == cudaSuccess);
 }
 
+__global__ static void timed_reduction(const float *input, float *output,
+        clock_t *timer) {
+    extern __shared__ float shared[];
+    const int tid = threadIdx.x;
+    const int bid = blockIdx.x;
+
+    if (tid == 0) timer[bid] = clock();
+
+    shared[tid] = input[tid];
+    shared[tid + blockDim.x] = input[tid + blockDim.x];
+
+    for (int d = blockDim.x; d > 0; d /= 2) {
+        __syncthreads();
+
+        if (tid < d) {
+            float f0 = shared[tid];
+            float f1 = shared[tid + d];
+
+            if (f1 < f0) {
+                shared[tid] = f1;
+            }
+        }
+    }
+
+    if (tid == 0) output[bid] = shared[0];
+
+    __syncthreads();
+
+    if (tid == 0) timer[bid + gridDim.x] = clock();
+}
+
 TEST_CASE("clock") {
     const int NUM_THREADS = 256;
+    const int NUM_BLOCKS = 64;
+    
+    clock_t timer[NUM_BLOCKS * 2];
     float input[NUM_THREADS * 2];
+    clock_t *dtimer = NULL;
 
     for (int i = 0; i < NUM_THREADS; i++) {
         input[i] = (float)i;
     }
 
     float *dinput = NULL;
-
+    float *doutput = NULL;
+    
+    // alloc mem
     cudaMalloc((void **)&dinput, sizeof(float) * NUM_THREADS * 2);
+    cudaMalloc((void **)&doutput, sizeof(float) * NUM_BLOCKS);
+    cudaMalloc((void **)&dtimer, sizeof(clock_t) * NUM_BLOCKS * 2);
+    
+    cudaMemcpy(dinput, input, sizeof(float) * NUM_THREADS * 2, 
+               cudaMemcpyHostToDevice);
+    timed_reduction<<<NUM_BLOCKS, NUM_THREADS, sizeof(float) * 2 * NUM_THREADS>>>
+        (dinput, doutput, dtimer);
+
+    cudaMemcpy(timer, dtimer, sizeof(clock_t) * NUM_BLOCKS * 2,
+            cudaMemcpyDeviceToHost);
+
+    cudaFree(dinput);
+    cudaFree(doutput);
+    cudaFree(dtimer);
+
+    long double avg_elpased_clocks = 0;
+    for (int i = 0; i < NUM_BLOCKS; i++) {
+        avg_elpased_clocks += (long double) (timer[i + NUM_BLOCKS] - timer[i]);
+    }
+
+    avg_elpased_clocks = avg_elpased_clocks / NUM_BLOCKS;
+    printf("Average clocks/block = %Lf\n", avg_elpased_clocks);
 }
