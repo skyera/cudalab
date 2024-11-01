@@ -738,20 +738,35 @@ __global__ static void timed_reduction(const float *input, float *output,
 }
 
 TEST_CASE("clock") {
+    int device_count = 0;
+
+    cudaGetDeviceCount(&device_count);
+    printf("Device count: %d\n", device_count);
+
+    int dev_id = 0;
+    int compute_mode = 0;
+    int major = 0;
+    int minor = 0;
+    cudaSetDevice(dev_id);
+
+    cudaDeviceGetAttribute(&compute_mode, cudaDevAttrComputeMode, dev_id);
+    cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, dev_id);
+    cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, dev_id);
+    printf("compute_mode %d major %d minor %d\n", compute_mode, major, minor);
+
     const int NUM_THREADS = 256;
     const int NUM_BLOCKS = 64;
     
     clock_t timer[NUM_BLOCKS * 2];
     float input[NUM_THREADS * 2];
     clock_t *dtimer = NULL;
+    float *dinput = NULL;
+    float *doutput = NULL;
 
-    for (int i = 0; i < NUM_THREADS; i++) {
+    for (int i = 0; i < NUM_THREADS * 2; i++) {
         input[i] = (float)i;
     }
 
-    float *dinput = NULL;
-    float *doutput = NULL;
-    
     // alloc mem
     cudaMalloc((void **)&dinput, sizeof(float) * NUM_THREADS * 2);
     cudaMalloc((void **)&doutput, sizeof(float) * NUM_BLOCKS);
