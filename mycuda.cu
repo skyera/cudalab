@@ -15,6 +15,51 @@
 #define MAX_DEPTH 16
 #define INSERTION_SORT 32
 
+#define check_cuda_errors(err) __check_cuda_errors(err, __FILE__, __LINE__)
+
+inline void __check_cuda_errors(cudaError err, const char *file, const int line)
+{
+    if (cudaSuccess != err) {
+        fprintf(stderr, "%s(%i): CUDA Runtime API error %d: %s.\n",
+                file, line, (int)err, cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+}
+
+inline int convert_smver2_cores(int major, int minor) {
+    typedef struct {
+        int SM; 
+        int Cores;
+    } sSMtoCores;
+  sSMtoCores nGpuArchCoresPerSM[] = {
+      {0x30, 192},
+      {0x32, 192},
+      {0x35, 192},
+      {0x37, 192},
+      {0x50, 128},
+      {0x52, 128},
+      {0x53, 128},
+      {0x60,  64},
+      {0x61, 128},
+      {0x62, 128},
+      {0x70,  64},
+      {0x72,  64},
+      {0x75,  64},
+      {-1, -1}};
+
+    int index = 0;
+    while (nGpuArchCoresPerSM[index].SM != -1) {
+        if (nGpuArchCoresPerSM[index].SM == ((major << 4) + minor)) {
+            return nGpuArchCoresPerSM[index].Cores;
+        }
+        ++index;
+    }
+    printf("MapSMtoCores for SM %d.%d is undefined."
+           " Default to use %d Cors/SM\n",
+           major, minor, nGpuArchCoresPerSM[index - 1].Cores);
+    return nGpuArchCoresPerSM[index - 1].Cores;
+}
+
 void vector_add(float *out, float *a, float *b, int n) {
     for (int i = 0; i < n; i++) {
         out[i] = a[i] + b[i];
@@ -754,6 +799,19 @@ TEST_CASE("clock") {
     cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, dev_id);
     printf("compute_mode %d major %d minor %d\n", compute_mode, major, minor);
 
+    int num_cores = convert_smver2_cores(major, minor);
+    printf("num cores: %d\n", num_cores);
+
+    int mprocessor_count = 0;
+    int clockrate = 0;
+    cudaDeviceGetAttribute(&mprocessor_count, cudaDevAttrMultiProcessorCount,
+            dev_id);
+    cudaDeviceGetAttribute(&clockrate, cudaDevAttrClockRate, dev_id);
+    printf("mprocessor count: %d\n", mprocessor_count);
+    printf("clockrate: %d\n", clockrate);
+
+    uint64_t compute_ref = (uint64_t) mprocessor_count * num_cores * clockrate;
+
     const int NUM_THREADS = 256;
     const int NUM_BLOCKS = 64;
     
@@ -791,4 +849,57 @@ TEST_CASE("clock") {
 
     avg_elpased_clocks = avg_elpased_clocks / NUM_BLOCKS;
     printf("Average clocks/block = %Lf\n", avg_elpased_clocks);
+}
+
+TEST_CASE("s_vectorAdd") {
+    cudaError_t err = cudaSuccess;
+    int num_elements = 50000;
+    size_t size = num_elements * sizeof(float);
+    float *h_A = (float *)malloc(size);
+    float *h_B = (float *)malloc(size);
+    float *h_C = (float *)malloc(size);
+
+    if (h_A == NULL || h_B == NULL || h_C == NULL) {
+        fprintf(stderr, "Failed to allocate host vectors!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    for (int i = 0; i < num_elements; ++i) {
+        h_A[i] = rand()/(float)RAND_MAX;
+        h_B[i] = rand()/(float)RAND_MAX;
+    }
+
+    float *d_A = NULL;
+    err = cudaMalloc((void **)&d_A, size);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "Failed to allocate device vector A "
+                "(error code %s)!\n", cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    float *d_B = NULL;
+    err = cudaMalloc((void **)&d_B, size);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "Failed to allocate device vector B "
+                "(error code %s)!\n", cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    float *d_C = NULL;
+    err = cudaMalloc((void **)&d_C, size);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "Failed to allocate device vector C "
+                "(error code %s)!]n", cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    printf("copy input data from host memory to CUDA device\n");
+    err = cudaMemcpy(d_A, h_A, size, cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "Failed top copy vector A from host to device "
+                "(error code %s)!\n", cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    err = cudaMemcpy(d_B, h_B, size, cudaMemcpyHostToDevice);
 }
