@@ -9,6 +9,26 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <iostream>
+#include <chrono>
+
+
+class Timer {
+public:
+    void start() {
+        start_time_ = std::chrono::high_resolution_clock::now();
+    }
+
+    void stop() {
+        end_time_ = std::chrono::high_resolution_clock::now();
+    }
+
+    double elapsed_seconds() const {
+        return std::chrono::duration<double>(end_time_ - start_time_).count();
+    }
+private:
+    std::chrono::high_resolution_clock::time_point start_time_;
+    std::chrono::high_resolution_clock::time_point end_time_;
+};
 
 #define N 10000000
 #define MAX_ERR 1e-6
@@ -131,7 +151,11 @@ TEST_CASE("vector_add") {
         a[i] = 1.0f;
         b[i] = 2.0f;
     }
+    Timer timer;
+    timer.start();
     vector_add(out, a, b, N);
+    timer.stop();
+    printf("vector_add %f seconds\n", timer.elapsed_seconds());
     free(a);
     free(b);
     free(out);
@@ -312,6 +336,10 @@ TEST_CASE("add") {
     });    
 }
 
+TEST_CASE("add1") {
+    run_add();
+}
+
 void run_cuda_add()
 {
 #undef N
@@ -359,8 +387,13 @@ void run_add_thread()
         x[i] = 1.0f;
         y[i] = 2.0f;
     }
+
+    Timer timer;
+    timer.start();
     cuda_add_thread<<<1,256>>>(N, x, y);
     cudaDeviceSynchronize();
+    timer.stop();
+    printf("vector add thread %f seconds\n", timer.elapsed_seconds());
 
     float max_error = 0.0f;
     for (int i = 0; i < N; i++) {
@@ -378,6 +411,10 @@ TEST_CASE("cuda_add_thread") {
     bench.run("xxx", [&] {
         run_add_thread();
     });
+}
+
+TEST_CASE("cuda_add_thread1") {
+    run_add_thread();
 }
 
 TEST_CASE("bench") {
