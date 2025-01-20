@@ -117,6 +117,15 @@ __global__ void cuda_vector_add_grid(float *out, float *a, float *b, int n) {
     }
 }
 
+__global__ void cuda_vector_add_grid_stride(float *out, float *a, float *b, int n) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+    for (int i = index; i < n; i += stride) {
+        out[index] = a[index] + b[index];
+    }
+}
+
 void add(int n, float *x, float *y) {
     for (int i = 0; i < n; i++) {
         y[i] = x[i] + y[i];
@@ -161,7 +170,7 @@ TEST_CASE("cpu_vector_add") {
     free(out);
 }
 
-TEST_CASE("cuda_vector_add") {
+void cuda_vector_add_func(int n_block, int n_thread) {
     float *a, *b, *out;
     float *d_a, *d_b, *d_out;
     cudaError_t e;
@@ -186,10 +195,11 @@ TEST_CASE("cuda_vector_add") {
     cudaMemcpy(d_b, b, sizeof(float) * N, cudaMemcpyHostToDevice);
     Timer timer;
     timer.start();
-    cuda_vector_add<<<1,1>>>(d_out, d_a, d_b, N);
+    cuda_vector_add_grid_stride<<<n_block, n_thread>>>(d_out, d_a, d_b, N);
     cudaDeviceSynchronize();
     timer.stop();
-    printf("cuda_vector_add N %d %f seconds\n", N, timer.elapsed_seconds());
+    printf("cuda_vector_add N %d n_block %d n_thread %d %f seconds\n", N,
+            n_block, n_thread, timer.elapsed_seconds());
 
     cudaMemcpy(out, d_out, sizeof(float) * N, cudaMemcpyDeviceToHost);
     
@@ -209,52 +219,16 @@ TEST_CASE("cuda_vector_add") {
     free(out);
 }
 
+TEST_CASE("cuda_vector_add_1_1") {
+    cuda_vector_add_func(1, 1);
+}
+
 TEST_CASE("cuda_vector_add_1_256") {
-    float *a, *b, *out;
-    float *d_a, *d_b, *d_out;
-    cudaError_t e;
+    cuda_vector_add_func(1, 256);
+}
 
-    a = (float*) malloc(sizeof(float) * N);
-    b = (float*) malloc(sizeof(float) * N);
-    out = (float*) malloc(sizeof(float) * N);
-
-    for (int i = 0; i < N; i++) {
-        a[i] = 1.0f;
-        b[i] = 2.0f;
-    }
-
-    e = cudaMalloc((void**)&d_a, sizeof(float) * N);
-    REQUIRE(e == cudaSuccess);
-    e = cudaMalloc((void**)&d_b, sizeof(float) * N);
-    REQUIRE(e == cudaSuccess);
-    e = cudaMalloc((void**)&d_out, sizeof(float) * N);
-    REQUIRE(e == cudaSuccess);
-
-    cudaMemcpy(d_a, a, sizeof(float) * N, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_b, b, sizeof(float) * N, cudaMemcpyHostToDevice);
-    Timer timer;
-    timer.start();
-    cuda_vector_add3<<<1,256>>>(d_out, d_a, d_b, N);
-    cudaDeviceSynchronize();
-    timer.stop();
-    printf("cuda_vector_add_1_256 N %d %f seconds\n", N, timer.elapsed_seconds());
-
-    cudaMemcpy(out, d_out, sizeof(float) * N, cudaMemcpyDeviceToHost);
-    
-    for (int i = 0; i < N; i++) {
-        INFO("i = ", i, " out=", out[i], " a=", a[i], " b=", b[i]);
-        REQUIRE(fabs(out[i] - a[i] - b[i]) < MAX_ERR);
-    }
-    printf("out[0] = %f\n", out[0]);
-    printf("PASSED\n");
-
-    cudaFree(d_a);
-    cudaFree(d_b);
-    cudaFree(d_out);
-
-    free(a);
-    free(b);
-    free(out);
+TEST_CASE("cuda_vector_add_2_256") {
+    cuda_vector_add_func(2, 256);
 }
 
 void run_cuda_add_grid()
