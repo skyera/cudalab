@@ -86,8 +86,7 @@ void cpu_vector_add(float *out, float *a, float *b, int n) {
     }
 }
 
-__global__ 
-void cuda_vector_add(float *out, float *a, float *b, int n) {
+__global__ void cuda_vector_add(float *out, float *a, float *b, int n) {
     for (int i = 0; i < n; i++) {
         out[i] = a[i] + b[i];
     }
@@ -210,7 +209,7 @@ TEST_CASE("cuda_vector_add") {
     free(out);
 }
 
-TEST_CASE("cuda_vector_addi_mthreads") {
+TEST_CASE("cuda_vector_add_1_256") {
     float *a, *b, *out;
     float *d_a, *d_b, *d_out;
     cudaError_t e;
@@ -233,7 +232,12 @@ TEST_CASE("cuda_vector_addi_mthreads") {
 
     cudaMemcpy(d_a, a, sizeof(float) * N, cudaMemcpyHostToDevice);
     cudaMemcpy(d_b, b, sizeof(float) * N, cudaMemcpyHostToDevice);
+    Timer timer;
+    timer.start();
     cuda_vector_add3<<<1,256>>>(d_out, d_a, d_b, N);
+    cudaDeviceSynchronize();
+    timer.stop();
+    printf("cuda_vector_add_1_256 N %d %f seconds\n", N, timer.elapsed_seconds());
 
     cudaMemcpy(out, d_out, sizeof(float) * N, cudaMemcpyDeviceToHost);
     
@@ -389,7 +393,7 @@ TEST_CASE("cuda_add") {
     });
 }
 
-void run_add_thread()
+void run_add_thread(int n_block, int n_thread)
 {
 #undef N
     int N = 1 << 20;
@@ -405,10 +409,11 @@ void run_add_thread()
 
     Timer timer;
     timer.start();
-    cuda_add_thread<<<1,256>>>(N, x, y);
+    cuda_add_thread<<<n_block, n_thread>>>(N, x, y);
     cudaDeviceSynchronize();
     timer.stop();
-    printf("vector add thread %f seconds\n", timer.elapsed_seconds());
+    printf("cuda_vector_add_%d_%d N %d %f seconds\n", n_block, n_thread,
+            N, timer.elapsed_seconds());
 
     float max_error = 0.0f;
     for (int i = 0; i < N; i++) {
@@ -424,12 +429,12 @@ TEST_CASE("cuda_add_thread") {
     ankerl::nanobench::Bench bench;
     
     bench.run("xxx", [&] {
-        run_add_thread();
+        //run_add_thread();
     });
 }
 
-TEST_CASE("cuda_add_thread1") {
-    run_add_thread();
+TEST_CASE("cuda_vector_add_2_256") {
+    run_add_thread(2, 256);
 }
 
 TEST_CASE("bench") {
