@@ -80,13 +80,14 @@ inline int convert_smver2_cores(int major, int minor) {
     return nGpuArchCoresPerSM[index - 1].Cores;
 }
 
-void vector_add(float *out, float *a, float *b, int n) {
+void cpu_vector_add(float *out, float *a, float *b, int n) {
     for (int i = 0; i < n; i++) {
         out[i] = a[i] + b[i];
     }
 }
 
-__global__ void cuda_vector_add(float *out, float *a, float *b, int n) {
+__global__ 
+void cuda_vector_add(float *out, float *a, float *b, int n) {
     for (int i = 0; i < n; i++) {
         out[i] = a[i] + b[i];
     }
@@ -140,7 +141,7 @@ void cuda_add_thread(int n, float *x, float *y) {
     }
 }
 
-TEST_CASE("vector_add") {
+TEST_CASE("cpu_vector_add") {
     float *a, *b, *out;
 
     a = (float*) malloc(sizeof(float) * N);
@@ -153,9 +154,9 @@ TEST_CASE("vector_add") {
     }
     Timer timer;
     timer.start();
-    vector_add(out, a, b, N);
+    cpu_vector_add(out, a, b, N);
     timer.stop();
-    printf("vector_add %f seconds\n", timer.elapsed_seconds());
+    printf("cpu_vector_add N %d %f seconds\n", N, timer.elapsed_seconds());
     free(a);
     free(b);
     free(out);
@@ -184,7 +185,12 @@ TEST_CASE("cuda_vector_add") {
 
     cudaMemcpy(d_a, a, sizeof(float) * N, cudaMemcpyHostToDevice);
     cudaMemcpy(d_b, b, sizeof(float) * N, cudaMemcpyHostToDevice);
+    Timer timer;
+    timer.start();
     cuda_vector_add<<<1,1>>>(d_out, d_a, d_b, N);
+    cudaDeviceSynchronize();
+    timer.stop();
+    printf("cuda_vector_add N %d %f seconds\n", N, timer.elapsed_seconds());
 
     cudaMemcpy(out, d_out, sizeof(float) * N, cudaMemcpyDeviceToHost);
     
