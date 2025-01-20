@@ -353,8 +353,13 @@ void run_cuda_add()
         x[i] = 1.0f;
         y[i] = 2.0f;
     }
+
+    Timer timer;
+    timer.start();
     cuda_add<<<1,1>>>(N, x, y);
     cudaDeviceSynchronize();
+    timer.stop();
+    printf("cuda add_1_1 %f\n", timer.elapsed_seconds());
 
     float max_error = 0.0f;
     for (int i = 0; i < N; i++) {
@@ -364,6 +369,10 @@ void run_cuda_add()
     
     cudaFree(x);
     cudaFree(y);
+}
+
+TEST_CASE("cuda_add_1_1") {
+    run_cuda_add();
 }
 
 TEST_CASE("cuda_add") {
