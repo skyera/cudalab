@@ -86,37 +86,6 @@ void cpu_vector_add(float *out, float *a, float *b, int n) {
     }
 }
 
-__global__ void cuda_vector_add(float *out, float *a, float *b, int n) {
-    for (int i = 0; i < n; i++) {
-        out[i] = a[i] + b[i];
-    }
-}
-
-__global__ void cuda_vector_add2(float *out, float *a, float *b, int n) {
-    int index = 0;
-    int stride = 1;
-
-    for (int i = index; i < n; i += stride) {
-        out[i] = a[i] + b[i];
-    }
-}
-
-__global__ void cuda_vector_add3(float *out, float *a, float *b, int n) {
-    int index = threadIdx.x;
-    int stride = blockDim.x;
-
-    for (int i = index; i < n; i += stride) {
-        out[i] = a[i] + b[i];
-    }
-}
-
-__global__ void cuda_vector_add_grid(float *out, float *a, float *b, int n) {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid < n) {
-        out[tid] = a[tid] + b[tid];
-    }
-}
-
 __global__ void cuda_vector_add_grid_stride(float *out, float *a, float *b, int n) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -135,16 +104,6 @@ void add(int n, float *x, float *y) {
 __global__
 void cuda_add(int n, float *x, float *y) {
     for (int i = 0; i < n; ++i) {
-        y[i] = x[i] + y[i];
-    }
-}
-
-__global__
-void cuda_add_thread(int n, float *x, float *y) {
-    int index = threadIdx.x;
-    int stride = blockDim.x;
-
-    for (int i = index; i < n; i+= stride) {
         y[i] = x[i] + y[i];
     }
 }
@@ -198,7 +157,7 @@ void cuda_vector_add_func(int n_block, int n_thread) {
     cuda_vector_add_grid_stride<<<n_block, n_thread>>>(d_out, d_a, d_b, N);
     cudaDeviceSynchronize();
     timer.stop();
-    printf("cuda_vector_add N %d n_block %d n_thread %d %f seconds\n", N,
+    printf("cuda_vector_add N: %d <<<%d, %d>>> %f: seconds\n", N,
             n_block, n_thread, timer.elapsed_seconds());
 
     cudaMemcpy(out, d_out, sizeof(float) * N, cudaMemcpyDeviceToHost);
@@ -207,8 +166,8 @@ void cuda_vector_add_func(int n_block, int n_thread) {
     /*     INFO("i = ", i, " out=", out[i], " a=", a[i], " b=", b[i]); */
     /*     REQUIRE(fabs(out[i] - a[i] - b[i]) < MAX_ERR); */
     /* } */
-    printf("out[0] = %f\n", out[0]);
-    printf("PASSED\n");
+    //printf("out[0] = %f\n", out[0]);
+    //printf("PASSED\n");
 
     cudaFree(d_a);
     cudaFree(d_b);
@@ -231,184 +190,8 @@ TEST_CASE("cuda_vector_add_2_256") {
     cuda_vector_add_func(2, 256);
 }
 
-void run_cuda_add_grid()
-{
-    float *a, *b, *out;
-    float *d_a, *d_b, *d_out;
-    cudaError_t e;
-
-    a = (float*) malloc(sizeof(float) * N);
-    b = (float*) malloc(sizeof(float) * N);
-    out = (float*) malloc(sizeof(float) * N);
-
-    for (int i = 0; i < N; i++) {
-        a[i] = 1.0f;
-        b[i] = 2.0f;
-    }
-
-    e = cudaMalloc((void**)&d_a, sizeof(float) * N);
-    REQUIRE(e == cudaSuccess);
-    e = cudaMalloc((void**)&d_b, sizeof(float) * N);
-    REQUIRE(e == cudaSuccess);
-    e = cudaMalloc((void**)&d_out, sizeof(float) * N);
-    REQUIRE(e == cudaSuccess);
-
-    cudaMemcpy(d_a, a, sizeof(float) * N, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_b, b, sizeof(float) * N, cudaMemcpyHostToDevice);
-    
-    /* int block_size = 256; */
-    /* int grid_size = (N + block_size) / block_size; */
-    int grid_size = 2;
-    int block_size = 32;
-    cuda_vector_add_grid<<<grid_size,block_size>>>(d_out, d_a, d_b, N);
-
-    cudaMemcpy(out, d_out, sizeof(float) * N, cudaMemcpyDeviceToHost);
-    
-    for (int i = 0; i < N; i++) {
-        INFO("i = ", i, " out=", out[i], " a=", a[i], " b=", b[i]);
-        // XXX
-        //REQUIRE(fabs(out[i] - a[i] - b[i]) < MAX_ERR);
-    }
-    printf("out[0] = %f\n", out[0]);
-    printf("PASSED\n");
-
-    cudaFree(d_a);
-    cudaFree(d_b);
-    cudaFree(d_out);
-
-    free(a);
-    free(b);
-    free(out);
-}
-
-TEST_CASE("cuda_vector_add_grid") {
-    ankerl::nanobench::Bench bench;
-
-    bench.run("add_grid", [&] {
-        run_cuda_add_grid();
-    });    
-}
-
-void run_add() {
-#undef N
-    int N = 1 << 20;
-
-    float *x = new float[N];
-    float *y = new float[N];
-
-    for (int i = 0; i < N; i++) {
-        x[i] = 1.0f;
-        y[i] = 2.0f;
-    }
-    add(N, x, y);
-
-    float max_error = 0.0f;
-    for (int i = 0; i < N; i++) {
-        max_error = fmax(max_error, fabs(y[i]-3.0f));
-    }
-    //std::cout << "max error: " << max_error << std::endl;  
-    
-    delete [] x;
-    delete [] y;
-}
-
-TEST_CASE("add") {
-    ankerl::nanobench::Bench bench;
-
-    bench.run("add", [&] {
-        run_add();
-    });    
-}
-
-TEST_CASE("add1") {
-    run_add();
-}
-
-void run_cuda_add()
-{
-#undef N
-    int N = 1 << 20;
-
-    float *x, *y;
-    cudaMallocManaged(&x, N*sizeof(float));
-    cudaMallocManaged(&y, N*sizeof(float));
-
-    for (int i = 0; i < N; i++) {
-        x[i] = 1.0f;
-        y[i] = 2.0f;
-    }
-
-    Timer timer;
-    timer.start();
-    cuda_add<<<1,1>>>(N, x, y);
-    cudaDeviceSynchronize();
-    timer.stop();
-    printf("cuda add_1_1 %f\n", timer.elapsed_seconds());
-
-    float max_error = 0.0f;
-    for (int i = 0; i < N; i++) {
-        max_error = fmax(max_error, fabs(y[i]-3.0f));
-    }
-    //std::cout << "max error: " << max_error << std::endl;  
-    
-    cudaFree(x);
-    cudaFree(y);
-}
-
-TEST_CASE("cuda_add_1_1") {
-    run_cuda_add();
-}
-
-TEST_CASE("cuda_add") {
-    ankerl::nanobench::Bench bench;
-    
-    bench.run("yyy", [&] {
-        run_add();
-    });
-}
-
-void run_add_thread(int n_block, int n_thread)
-{
-#undef N
-    int N = 1 << 20;
-
-    float *x, *y;
-    cudaMallocManaged(&x, N*sizeof(float));
-    cudaMallocManaged(&y, N*sizeof(float));
-
-    for (int i = 0; i < N; i++) {
-        x[i] = 1.0f;
-        y[i] = 2.0f;
-    }
-
-    Timer timer;
-    timer.start();
-    cuda_add_thread<<<n_block, n_thread>>>(N, x, y);
-    cudaDeviceSynchronize();
-    timer.stop();
-    printf("cuda_vector_add_%d_%d N %d %f seconds\n", n_block, n_thread,
-            N, timer.elapsed_seconds());
-
-    float max_error = 0.0f;
-    for (int i = 0; i < N; i++) {
-        max_error = fmax(max_error, fabs(y[i]-3.0f));
-    }
-    //std::cout << "max error: " << max_error << std::endl;  
-    
-    cudaFree(x);
-    cudaFree(y);
-}
-
-TEST_CASE("cuda_add_thread") {
-    ankerl::nanobench::Bench bench;
-    
-    bench.run("xxx", [&] {
-        //run_add_thread();
-    });
-}
-
-TEST_CASE("cuda_vector_add_2_256") {
-    run_add_thread(2, 256);
+TEST_CASE("cuda_vector_add_256_256") {
+    cuda_vector_add_func(256, 256);
 }
 
 TEST_CASE("bench") {
