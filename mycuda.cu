@@ -86,25 +86,12 @@ void cpu_vector_add(float *out, float *a, float *b, int n) {
     }
 }
 
-__global__ void cuda_vector_add_grid_stride(float *out, float *a, float *b, int n) {
+__global__ void cuda_vector_add(float *out, float *a, float *b, int n) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
 
     for (int i = index; i < n; i += stride) {
         out[index] = a[index] + b[index];
-    }
-}
-
-void add(int n, float *x, float *y) {
-    for (int i = 0; i < n; i++) {
-        y[i] = x[i] + y[i];
-    }
-}
-
-__global__
-void cuda_add(int n, float *x, float *y) {
-    for (int i = 0; i < n; ++i) {
-        y[i] = x[i] + y[i];
     }
 }
 
@@ -129,7 +116,7 @@ TEST_CASE("cpu_vector_add") {
     free(out);
 }
 
-void cuda_vector_add_func(int n_block, int n_thread) {
+void do_cuda_vector_add(int n_block, int n_thread) {
     float *a, *b, *out;
     float *d_a, *d_b, *d_out;
     cudaError_t e;
@@ -154,7 +141,7 @@ void cuda_vector_add_func(int n_block, int n_thread) {
     cudaMemcpy(d_b, b, sizeof(float) * N, cudaMemcpyHostToDevice);
     Timer timer;
     timer.start();
-    cuda_vector_add_grid_stride<<<n_block, n_thread>>>(d_out, d_a, d_b, N);
+    cuda_vector_add<<<n_block, n_thread>>>(d_out, d_a, d_b, N);
     cudaDeviceSynchronize();
     timer.stop();
     printf("cuda_vector_add N: %d <<<%d, %d>>> %f: seconds\n", N,
@@ -179,23 +166,23 @@ void cuda_vector_add_func(int n_block, int n_thread) {
 }
 
 TEST_CASE("cuda_vector_add_1_1") {
-    cuda_vector_add_func(1, 1);
+    do_cuda_vector_add(1, 1);
 }
 
 TEST_CASE("cuda_vector_add_1_256") {
-    cuda_vector_add_func(1, 256);
+    do_cuda_vector_add(1, 256);
 }
 
 TEST_CASE("cuda_vector_add_2_256") {
-    cuda_vector_add_func(2, 256);
+    do_cuda_vector_add(2, 256);
 }
 
 TEST_CASE("cuda_vector_add_256_256") {
-    cuda_vector_add_func(256, 256);
+    do_cuda_vector_add(256, 256);
 }
 
 TEST_CASE("cuda_vector_add_256_1024") {
-    cuda_vector_add_func(256, 1024);
+    do_cuda_vector_add(256, 1024);
 }
 
 TEST_CASE("bench") {
@@ -650,8 +637,7 @@ TEST_CASE("clock") {
     
     cudaMemcpy(dinput, input, sizeof(float) * NUM_THREADS * 2, 
                cudaMemcpyHostToDevice);
-    timed_reduction<<<NUM_BLOCKS, NUM_THREADS, sizeof(float) * 2 * NUM_THREADS>>>
-        (dinput, doutput, dtimer);
+    timed_reduction<<<NUM_BLOCKS, NUM_THREADS, sizeof(float) * 2 * NUM_THREADS>>> (dinput, doutput, dtimer);
 
     cudaMemcpy(timer, dtimer, sizeof(clock_t) * NUM_BLOCKS * 2,
             cudaMemcpyDeviceToHost);
