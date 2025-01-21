@@ -194,6 +194,10 @@ TEST_CASE("cuda_vector_add_256_256") {
     cuda_vector_add_func(256, 256);
 }
 
+TEST_CASE("cuda_vector_add_256_1024") {
+    cuda_vector_add_func(256, 1024);
+}
+
 TEST_CASE("bench") {
     double d = 1.0;
     ankerl::nanobench::Bench().run("some double ops", [&] {
@@ -716,4 +720,22 @@ TEST_CASE("s_vectorAdd") {
     }
 
     err = cudaMemcpy(d_B, h_B, size, cudaMemcpyHostToDevice);
+}
+
+TEST_CASE("max_n_block_thread") {
+    cudaDeviceProp prop;
+    int device;
+
+    cudaGetDevice(&device);
+    cudaGetDeviceProperties(&prop, device);
+    std::cout << "Device Name: " << prop.name << std::endl;
+    std::cout << "Max Threads per Block: " << prop.maxThreadsPerBlock << std::endl;
+    std::cout << "Max Threads Dimension (x, y, z): "
+        << prop.maxThreadsDim[0] << ", "
+        << prop.maxThreadsDim[1] << ", "
+        << prop.maxThreadsDim[2] << std::endl;
+    std::cout << "Max Grid Size (x, y, z):"
+        << prop.maxGridSize[0] << ", "
+        << prop.maxGridSize[1] << ", "
+        << prop.maxGridSize[2] << std::endl;
 }
