@@ -10,6 +10,7 @@
 #include <cuda_runtime.h>
 #include <iostream>
 #include <chrono>
+#include <sys/utsname.h>
 
 
 class Timer {
@@ -724,4 +725,31 @@ TEST_CASE("max_n_block_thread") {
         << prop.maxGridSize[0] << ", "
         << prop.maxGridSize[1] << ", "
         << prop.maxGridSize[2] << std::endl;
+}
+
+__global__ void test_kernel(int num) {
+    int gtid = blockIdx.x * blockDim.x + threadIdx.x;
+    assert(gtid < num);
+}
+
+TEST_CASE("simple_assert") {
+    utsname os_type;
+    uname(&os_type);
+
+    printf("os type release=%s version %s\n", os_type.release, os_type.version);
+    
+    int n_blocks = 2;
+    int n_threads = 32;
+    dim3 dim_grid(n_blocks);
+    dim3 dim_block(n_threads);
+
+    test_kernel<<<dim_grid, dim_block>>>(60);
+    printf("\nBegin assert\n");
+    cudaError_t error = cudaDeviceSynchronize();
+    printf("\nEnd assert\n");
+
+    if (error == cudaErrorAssert) {
+        printf("Device assert failed as expected, "
+               "CUDA error message: %s\n", cudaGetErrorString(error));
+    }
 }
