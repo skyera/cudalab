@@ -753,3 +753,10 @@ TEST_CASE("simple_assert") {
                "CUDA error message: %s\n", cudaGetErrorString(error));
     }
 }
+
+TEST_CASE("device") {
+    int device_count = 0;
+
+    cudaGetDeviceCount(&device_count);
+    printf("device_count: %d\n", device_count);
+}
