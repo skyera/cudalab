@@ -249,11 +249,35 @@ LIBRARIES :=
 
 ################################################################################
 
-# Gencode arguments
-ifeq ($(TARGET_ARCH),$(filter $(TARGET_ARCH),armv7l aarch64))
-SMS ?= 53 61 62 70 72 75
-else
-SMS ?= 61 70 75
+# Detect CUDA major version (default to 10 if not found/detected)
+CUDA_VERSION_MAJOR := $(shell $(CUDA_PATH)/bin/nvcc --version 2>/dev/null | grep "release" | sed 's/.*release //' | cut -d. -f1)
+CUDA_VERSION_MAJOR ?= 10
+
+# Gencode arguments (dynamically set based on target architecture and CUDA version)
+ifeq ($(SMS),)
+    ifeq ($(TARGET_ARCH),$(filter $(TARGET_ARCH),armv7l aarch64))
+        ifeq ($(CUDA_VERSION_MAJOR),10)
+            SMS := 53 62 72 75
+        else ifeq ($(CUDA_VERSION_MAJOR),11)
+            SMS := 53 62 72 75 87
+        else ifeq ($(CUDA_VERSION_MAJOR),12)
+            SMS := 53 62 72 75 87 90
+        else
+            # Default for CUDA 13 and above (drops older architectures like 53 and 62)
+            SMS := 72 75 87 90
+        endif
+    else
+        ifeq ($(CUDA_VERSION_MAJOR),10)
+            SMS := 61 70 75
+        else ifeq ($(CUDA_VERSION_MAJOR),11)
+            SMS := 61 70 75 80 86
+        else ifeq ($(CUDA_VERSION_MAJOR),12)
+            SMS := 61 70 75 80 86 89 90
+        else
+            # Default for CUDA 13 and above (drops older Pascal architecture 61)
+            SMS := 70 75 80 86 89 90
+        endif
+    endif
 endif
 
 ifeq ($(SMS),)
