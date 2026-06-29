@@ -263,8 +263,8 @@ ifeq ($(SMS),)
         else ifeq ($(CUDA_VERSION_MAJOR),12)
             SMS := 53 62 72 75 87 90
         else
-            # Default for CUDA 13 and above (drops older architectures like 53 and 62)
-            SMS := 72 75 87 90
+            # Default for CUDA 13 and above (drops older architectures like 53, 62, and 72)
+            SMS := 75 87 90
         endif
     else
         ifeq ($(CUDA_VERSION_MAJOR),10)
@@ -274,8 +274,8 @@ ifeq ($(SMS),)
         else ifeq ($(CUDA_VERSION_MAJOR),12)
             SMS := 61 70 75 80 86 89 90
         else
-            # Default for CUDA 13 and above (drops older Pascal architecture 61)
-            SMS := 70 75 80 86 89 90
+            # Default for CUDA 13 and above (drops older architectures like 61 and 70)
+            SMS := 75 80 86 89 90
         endif
     endif
 endif
