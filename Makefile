@@ -1,5 +1,19 @@
 # Location of the CUDA Toolkit
-CUDA_PATH ?= /usr/local/cuda-10.2
+ifeq ($(CUDA_PATH),)
+    # 1. Try to locate nvcc in the system PATH
+    NVCC_PATH := $(shell which nvcc 2>/dev/null)
+    ifneq ($(NVCC_PATH),)
+        # Derive CUDA_PATH by taking the parent directory of where nvcc resides
+        CUDA_PATH := $(abspath $(dir $(NVCC_PATH))../)
+    else
+        # 2. Fall back to standard/default installation paths
+        ifneq ($(wildcard /usr/local/cuda),)
+            CUDA_PATH := /usr/local/cuda
+        else
+            CUDA_PATH := /usr/local/cuda-10.2
+        endif
+    endif
+endif
 
 ##############################
 # start deprecated interface #
