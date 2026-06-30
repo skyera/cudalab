@@ -289,9 +289,18 @@ TEST_CASE("getdevice") {
 
 void print_devprop(const cudaDeviceProp& devprop) {
     std::cout << "name: " << devprop.name << "\n"
-        << "ECCEnabled: " << devprop.ECCEnabled << "\n"
-        << "clockRate: " << devprop.clockRate << "\n"
-        << "l2CacheSize: " << devprop.l2CacheSize << "\n";
+        << "ECCEnabled: " << devprop.ECCEnabled << "\n";
+#if CUDART_VERSION < 12000
+    std::cout << "clockRate: " << devprop.clockRate << "\n";
+#else
+    int clockRate = 0;
+    int dev_id = 0;
+    if (cudaGetDevice(&dev_id) == cudaSuccess) {
+        cudaDeviceGetAttribute(&clockRate, cudaDevAttrClockRate, dev_id);
+    }
+    std::cout << "clockRate: " << clockRate << "\n";
+#endif
+    std::cout << "l2CacheSize: " << devprop.l2CacheSize << "\n";
 }
 
 TEST_CASE("devprop") {
