@@ -310,7 +310,7 @@ endif
 # Target rules
 all: build
 
-build: mycuda
+build: cuda_test
 
 check.deps:
 ifeq ($(SAMPLE_ENABLED),0)
@@ -322,13 +322,13 @@ endif
 mycuda.o:mycuda.cu
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
-mycuda: mycuda.o
+cuda_test: mycuda.o
 	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
 run: build
-	$(EXEC) ./mycuda
+	$(EXEC) ./cuda_test
 
 clean:
-	rm -f mycuda mycuda.o
+	rm -f cuda_test mycuda.o
 
 clobber: clean
