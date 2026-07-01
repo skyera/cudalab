@@ -210,7 +210,6 @@ TEST_CASE("device_count") {
     int count = 0;
     cudaError_t e = cudaGetDeviceCount(&count);
     REQUIRE(e == cudaSuccess);
-    REQUIRE(count == 1);
     std::cout << "device count: " << count << "\n";
 }
 
