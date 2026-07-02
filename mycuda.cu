@@ -613,6 +613,11 @@ TEST_CASE("vectoradd") {
         printf("failed to allocate device mem: %s\n", cudaGetErrorString(e));
     }
     REQUIRE(e == cudaSuccess);
+
+    cudaFree(d_a);
+    free(h_a);
+    free(h_b);
+    free(h_c);
 }
 
 __global__ static void timed_reduction(const float *input, float *output,
