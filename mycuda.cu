@@ -489,17 +489,46 @@ __device__ void selection_sort(unsigned int *data, int left, int right)
 __global__ void cdp_simple_quicksort(unsigned int *data, int left, int right,
         int depth)
 {
-    if (depth >= MAX_DEPTH || right -left <= INSERTION_SORT) {
+    if (depth >= MAX_DEPTH || right - left <= INSERTION_SORT) {
         selection_sort(data, left, right);
         return;
     }
 
     unsigned int *lptr = data + left;
     unsigned int *rptr = data + right;
-    unsigned int pivot = data[(left+right)/2];
+    unsigned int pivot = data[(left + right) / 2];
 
     while (lptr <= rptr) {
+        while (*lptr < pivot) {
+            lptr++;
+        }
+        while (*rptr > pivot) {
+            rptr--;
+        }
 
+        if (lptr <= rptr) {
+            unsigned int temp = *lptr;
+            *lptr = *rptr;
+            *rptr = temp;
+            lptr++;
+            rptr--;
+        }
+    }
+
+    int nright = rptr - data;
+    int nleft = lptr - data;
+
+    if (left < nright) {
+        cudaStream_t s;
+        cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking);
+        cdp_simple_quicksort<<<1, 1, 0, s>>>(data, left, nright, depth + 1);
+        cudaStreamDestroy(s);
+    }
+    if (nleft < right) {
+        cudaStream_t s;
+        cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking);
+        cdp_simple_quicksort<<<1, 1, 0, s>>>(data, nleft, right, depth + 1);
+        cudaStreamDestroy(s);
     }
 }
 
@@ -517,7 +546,7 @@ void run_qsort(unsigned int *data, unsigned int nitems)
     cudaDeviceSetLimit(cudaLimitDevRuntimeSyncDepth, MAX_DEPTH);
     int left = 0;
     int right = nitems - 1;
-
+    cdp_simple_quicksort<<<1, 1>>>(data, left, right, 0);
 }
 
 TEST_CASE("cdpSimpleQuicksort") {
@@ -533,7 +562,7 @@ TEST_CASE("cdpSimpleQuicksort") {
     cudaGetDeviceProperties(&devprop, dev);
     printf("major %d minor %d\n", devprop.major, devprop.minor);
 
-    int num_items= 128;
+    int num_items = 128;
     unsigned int *h_data = 0;
     h_data = (unsigned int*) malloc(num_items * sizeof(unsigned int));
     initialize_data(h_data, num_items);
@@ -544,6 +573,20 @@ TEST_CASE("cdpSimpleQuicksort") {
     e = cudaMemcpy(d_data, h_data, num_items * sizeof(unsigned int),
             cudaMemcpyHostToDevice);
     REQUIRE(e == cudaSuccess);
+
+    run_qsort(d_data, num_items);
+    cudaDeviceSynchronize();
+    e = cudaGetLastError();
+    REQUIRE(e == cudaSuccess);
+
+    e = cudaMemcpy(h_data, d_data, num_items * sizeof(unsigned int),
+            cudaMemcpyDeviceToHost);
+    REQUIRE(e == cudaSuccess);
+
+    for (int i = 1; i < num_items; i++) {
+        REQUIRE(h_data[i - 1] <= h_data[i]);
+    }
+
     cudaFree(d_data);
     free(h_data);
 }
