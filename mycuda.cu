@@ -680,6 +680,7 @@ TEST_CASE("clock") {
     printf("clockrate: %d\n", clockrate);
 
     uint64_t compute_ref = (uint64_t) mprocessor_count * num_cores * clockrate;
+    printf("compute_ref: %llu\n", (unsigned long long)compute_ref);
 
     const int NUM_THREADS = 256;
     const int NUM_BLOCKS = 64;
