@@ -410,7 +410,7 @@ __global__ void cdp_kernel(int max_depth, int depth, int thread,
     __shared__ int s_uid;
 
     if (threadIdx.x == 0) {
-        s_uid = atomic_add((double*)&g_uids, 1);
+        s_uid = atomicAdd(&g_uids, 1);
     }
 
     __syncthreads();
