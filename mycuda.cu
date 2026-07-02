@@ -859,6 +859,9 @@ TEST_CASE("device") {
         e = cudaGetDeviceProperties(&prop, i);
         REQUIRE(e == cudaSuccess);
 
+        int clockRate = 0;
+        cudaDeviceGetAttribute(&clockRate, cudaDevAttrClockRate, i);
+
         printf("Device %d: \"%s\"\n", i, prop.name);
         printf("  Compute Capability:          %d.%d\n", prop.major, prop.minor);
         printf("  Total Global Memory:         %.2f GB (%llu bytes)\n", 
@@ -866,7 +869,7 @@ TEST_CASE("device") {
                (unsigned long long)prop.totalGlobalMem);
         printf("  Multiprocessors (SMs):       %d\n", prop.multiProcessorCount);
         printf("  GPU Max Clock Rate:          %.0f MHz (%d kHz)\n", 
-               (double)prop.clockRate / 1000.0, prop.clockRate);
+               (double)clockRate / 1000.0, clockRate);
         printf("  L2 Cache Size:               %d bytes\n", prop.l2CacheSize);
         printf("  Total Constant Memory:       %zu bytes\n", prop.totalConstMem);
         printf("  Shared Memory per Block:     %zu bytes\n", prop.sharedMemPerBlock);
