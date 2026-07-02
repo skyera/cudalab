@@ -36,16 +36,7 @@ private:
 #define MAX_DEPTH 16
 #define INSERTION_SORT 32
 
-#define check_cuda_errors(err) __check_cuda_errors(err, __FILE__, __LINE__)
 
-inline void __check_cuda_errors(cudaError err, const char *file, const int line)
-{
-    if (cudaSuccess != err) {
-        fprintf(stderr, "%s(%i): CUDA Runtime API error %d: %s.\n",
-                file, line, (int)err, cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-}
 
 inline int convert_smver2_cores(int major, int minor) {
     typedef struct {
@@ -211,6 +202,8 @@ __global__ void cuda_hello()
 
 TEST_CASE("hello") {
     cuda_hello<<<1,1>>>();
+    cudaDeviceSynchronize();
+    REQUIRE(cudaGetLastError() == cudaSuccess);
 }
 
 TEST_CASE("device_count") {
@@ -349,6 +342,8 @@ TEST_CASE("asyncAPI") {
     e = cudaDeviceSynchronize();
     REQUIRE(e == cudaSuccess);
     
+    e = cudaEventRecord(start, 0);
+    REQUIRE(e == cudaSuccess);
     cudaMemcpyAsync(d_a, a, nbytes, cudaMemcpyHostToDevice, 0);
 
     dim3 threads = dim3(512, 1);
@@ -357,6 +352,21 @@ TEST_CASE("asyncAPI") {
     
     increment_kernel<<<blocks, threads, 0, 0>>>(d_a, value);
     cudaMemcpyAsync(a, d_a, nbytes, cudaMemcpyDeviceToHost, 0);
+    
+    e = cudaEventRecord(stop, 0);
+    REQUIRE(e == cudaSuccess);
+    e = cudaEventSynchronize(stop);
+    REQUIRE(e == cudaSuccess);
+
+    float elapsed_time = 0.0f;
+    e = cudaEventElapsedTime(&elapsed_time, start, stop);
+    REQUIRE(e == cudaSuccess);
+    printf("asyncAPI GPU elapsed time: %f ms\n", elapsed_time);
+
+    e = cudaEventDestroy(start);
+    REQUIRE(e == cudaSuccess);
+    e = cudaEventDestroy(stop);
+    REQUIRE(e == cudaSuccess);
 
     e = cudaFreeHost(a);
     REQUIRE(e == cudaSuccess);
@@ -364,21 +374,7 @@ TEST_CASE("asyncAPI") {
     REQUIRE(e == cudaSuccess);
 }
 
-__device__ double atomic_add(double* address, double val)
-{
-    unsigned long long int* address_as_ull =
-        (unsigned long long int*) address;
-    unsigned long long int old = *address_as_ull, assumed;
 
-    do {
-        assumed = old;
-        old = atomicCAS(address_as_ull, assumed,
-                        __double_as_longlong(val +
-                        __longlong_as_double(assumed)));
-    } while (assumed != old);
-
-    return __longlong_as_double(old);
-}
 
 __device__ void print_info(int depth, int thread, int uid, int parent_uid)
 {
