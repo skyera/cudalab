@@ -122,35 +122,42 @@ void do_cuda_vector_add(int n_block, int n_thread) {
     float *d_a, *d_b, *d_out;
     cudaError_t e;
 
-    a = (float*) malloc(sizeof(float) * N);
-    b = (float*) malloc(sizeof(float) * N);
-    out = (float*) malloc(sizeof(float) * N);
+    int num_elements = N;
+    // Scale down the size for 1 block / 1 thread configuration. 
+    // In debug builds (-G), 10 million elements sequentially on a single thread exceeds the OS watchdog timer.
+    if (n_block == 1 && n_thread == 1) {
+        num_elements = 100000;
+    }
 
-    for (int i = 0; i < N; i++) {
+    a = (float*) malloc(sizeof(float) * num_elements);
+    b = (float*) malloc(sizeof(float) * num_elements);
+    out = (float*) malloc(sizeof(float) * num_elements);
+
+    for (int i = 0; i < num_elements; i++) {
         a[i] = 1.0f;
         b[i] = 2.0f;
     }
 
-    e = cudaMalloc((void**)&d_a, sizeof(float) * N);
+    e = cudaMalloc((void**)&d_a, sizeof(float) * num_elements);
     REQUIRE(e == cudaSuccess);
-    e = cudaMalloc((void**)&d_b, sizeof(float) * N);
+    e = cudaMalloc((void**)&d_b, sizeof(float) * num_elements);
     REQUIRE(e == cudaSuccess);
-    e = cudaMalloc((void**)&d_out, sizeof(float) * N);
+    e = cudaMalloc((void**)&d_out, sizeof(float) * num_elements);
     REQUIRE(e == cudaSuccess);
 
-    cudaMemcpy(d_a, a, sizeof(float) * N, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_b, b, sizeof(float) * N, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_a, a, sizeof(float) * num_elements, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, b, sizeof(float) * num_elements, cudaMemcpyHostToDevice);
     Timer timer;
     timer.start();
-    cuda_vector_add<<<n_block, n_thread>>>(d_out, d_a, d_b, N);
+    cuda_vector_add<<<n_block, n_thread>>>(d_out, d_a, d_b, num_elements);
     cudaDeviceSynchronize();
     timer.stop();
-    printf("cuda_vector_add N: %d <<<%d, %d>>> %f: seconds\n", N,
+    printf("cuda_vector_add N: %d <<<%d, %d>>> %f: seconds\n", num_elements,
             n_block, n_thread, timer.elapsed_seconds());
 
-    cudaMemcpy(out, d_out, sizeof(float) * N, cudaMemcpyDeviceToHost);
+    cudaMemcpy(out, d_out, sizeof(float) * num_elements, cudaMemcpyDeviceToHost);
     
-    /* for (int i = 0; i < N; i++) { */
+    /* for (int i = 0; i < num_elements; i++) { */
     /*     INFO("i = ", i, " out=", out[i], " a=", a[i], " b=", b[i]); */
     /*     REQUIRE(fabs(out[i] - a[i] - b[i]) < MAX_ERR); */
     /* } */
