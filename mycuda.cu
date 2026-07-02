@@ -11,7 +11,58 @@
 #include <iostream>
 #include <chrono>
 #include <sys/utsname.h>
+#include <vector>
+#include <memory>
+#include <stdexcept>
 
+template <typename T>
+struct DevicePtr {
+    T* ptr = nullptr;
+    explicit DevicePtr(size_t count) {
+        cudaError_t err = cudaMalloc(&ptr, count * sizeof(T));
+        REQUIRE(err == cudaSuccess);
+    }
+    ~DevicePtr() {
+        if (ptr) {
+            cudaFree(ptr);
+        }
+    }
+    T* get() const { return ptr; }
+    DevicePtr(const DevicePtr&) = delete;
+    DevicePtr& operator=(const DevicePtr&) = delete;
+};
+
+template <typename T>
+struct HostPinnedPtr {
+    T* ptr = nullptr;
+    explicit HostPinnedPtr(size_t count) {
+        cudaError_t err = cudaMallocHost((void**)&ptr, count * sizeof(T));
+        REQUIRE(err == cudaSuccess);
+    }
+    ~HostPinnedPtr() {
+        if (ptr) {
+            cudaFreeHost(ptr);
+        }
+    }
+    T* get() const { return ptr; }
+    HostPinnedPtr(const HostPinnedPtr&) = delete;
+    HostPinnedPtr& operator=(const HostPinnedPtr&) = delete;
+};
+
+struct CudaEvent {
+    cudaEvent_t event;
+    CudaEvent() {
+        cudaError_t err = cudaEventCreate(&event);
+        REQUIRE(err == cudaSuccess);
+    }
+    ~CudaEvent() {
+        cudaEventDestroy(event);
+    }
+    cudaEvent_t get() const { return event; }
+    operator cudaEvent_t() const { return event; }
+    CudaEvent(const CudaEvent&) = delete;
+    CudaEvent& operator=(const CudaEvent&) = delete;
+};
 
 class Timer {
 public:
@@ -93,29 +144,18 @@ __global__ void cuda_vector_add(float *out, float *a, float *b, int n) {
 }
 
 TEST_CASE("cpu_vector_add") {
-    float *a, *b, *out;
+    std::vector<float> a(N, 1.0f);
+    std::vector<float> b(N, 2.0f);
+    std::vector<float> out(N, 0.0f);
 
-    a = (float*) malloc(sizeof(float) * N);
-    b = (float*) malloc(sizeof(float) * N);
-    out = (float*) malloc(sizeof(float) * N);
-
-    for (int i = 0; i < N; i++) {
-        a[i] = 1.0f;
-        b[i] = 2.0f;
-    }
     Timer timer;
     timer.start();
-    cpu_vector_add(out, a, b, N);
+    cpu_vector_add(out.data(), a.data(), b.data(), N);
     timer.stop();
     printf("cpu_vector_add N %d %f seconds\n", N, timer.elapsed_seconds());
-    free(a);
-    free(b);
-    free(out);
 }
 
 void do_cuda_vector_add(int n_block, int n_thread) {
-    float *a, *b, *out;
-    float *d_a, *d_b, *d_out;
     cudaError_t e;
 
     int num_elements = N;
@@ -125,48 +165,38 @@ void do_cuda_vector_add(int n_block, int n_thread) {
         num_elements = 100000;
     }
 
-    a = (float*) malloc(sizeof(float) * num_elements);
-    b = (float*) malloc(sizeof(float) * num_elements);
-    out = (float*) malloc(sizeof(float) * num_elements);
+    std::vector<float> a(num_elements, 1.0f);
+    std::vector<float> b(num_elements, 2.0f);
+    std::vector<float> out(num_elements, 0.0f);
 
-    for (int i = 0; i < num_elements; i++) {
-        a[i] = 1.0f;
-        b[i] = 2.0f;
-    }
+    DevicePtr<float> d_a(num_elements);
+    DevicePtr<float> d_b(num_elements);
+    DevicePtr<float> d_out(num_elements);
 
-    e = cudaMalloc((void**)&d_a, sizeof(float) * num_elements);
+    e = cudaMemcpy(d_a.get(), a.data(), sizeof(float) * num_elements, cudaMemcpyHostToDevice);
     REQUIRE(e == cudaSuccess);
-    e = cudaMalloc((void**)&d_b, sizeof(float) * num_elements);
-    REQUIRE(e == cudaSuccess);
-    e = cudaMalloc((void**)&d_out, sizeof(float) * num_elements);
+    e = cudaMemcpy(d_b.get(), b.data(), sizeof(float) * num_elements, cudaMemcpyHostToDevice);
     REQUIRE(e == cudaSuccess);
 
-    cudaMemcpy(d_a, a, sizeof(float) * num_elements, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_b, b, sizeof(float) * num_elements, cudaMemcpyHostToDevice);
     Timer timer;
     timer.start();
-    cuda_vector_add<<<n_block, n_thread>>>(d_out, d_a, d_b, num_elements);
-    cudaDeviceSynchronize();
+    cuda_vector_add<<<n_block, n_thread>>>(d_out.get(), d_a.get(), d_b.get(), num_elements);
+    e = cudaGetLastError();
+    REQUIRE(e == cudaSuccess);
+    
+    e = cudaDeviceSynchronize();
+    REQUIRE(e == cudaSuccess);
     timer.stop();
     printf("cuda_vector_add N: %d <<<%d, %d>>> %f: seconds\n", num_elements,
             n_block, n_thread, timer.elapsed_seconds());
 
-    cudaMemcpy(out, d_out, sizeof(float) * num_elements, cudaMemcpyDeviceToHost);
+    e = cudaMemcpy(out.data(), d_out.get(), sizeof(float) * num_elements, cudaMemcpyDeviceToHost);
+    REQUIRE(e == cudaSuccess);
     
-    /* for (int i = 0; i < num_elements; i++) { */
-    /*     INFO("i = ", i, " out=", out[i], " a=", a[i], " b=", b[i]); */
-    /*     REQUIRE(fabs(out[i] - a[i] - b[i]) < MAX_ERR); */
-    /* } */
-    //printf("out[0] = %f\n", out[0]);
-    //printf("PASSED\n");
-
-    cudaFree(d_a);
-    cudaFree(d_b);
-    cudaFree(d_out);
-
-    free(a);
-    free(b);
-    free(out);
+    for (int i = 0; i < num_elements; i++) {
+        INFO("i = ", i, " out=", out[i], " a=", a[i], " b=", b[i]);
+        REQUIRE(fabs(out[i] - a[i] - b[i]) < MAX_ERR);
+    }
 }
 
 TEST_CASE("cuda_vector_add_1_1") {
@@ -330,38 +360,36 @@ __global__ void increment_kernel(int *g_data, int inc_value)
 TEST_CASE("asyncAPI") {
     int n = 16 * 1024 * 1024;
     int nbytes = n * sizeof(int);
-    int *a = 0;
 
-    cudaError_t e = cudaMallocHost((void**)&a, nbytes);
-    REQUIRE(e == cudaSuccess);
-    memset(a, 0, nbytes);
+    HostPinnedPtr<int> a(n);
+    memset(a.get(), 0, nbytes);
 
-    int *d_a = 0;
-    e = cudaMalloc((void**)&d_a, nbytes);
-    REQUIRE(e == cudaSuccess);
-    e = cudaMemset(d_a, 255, nbytes);
+    DevicePtr<int> d_a(n);
+    cudaError_t e = cudaMemset(d_a.get(), 255, nbytes);
     REQUIRE(e == cudaSuccess);
 
     // event
-    cudaEvent_t start, stop;
-    e = cudaEventCreate(&start);
-    REQUIRE(e == cudaSuccess);
-    e = cudaEventCreate(&stop);
-    REQUIRE(e == cudaSuccess);
+    CudaEvent start, stop;
 
     e = cudaDeviceSynchronize();
     REQUIRE(e == cudaSuccess);
     
     e = cudaEventRecord(start, 0);
     REQUIRE(e == cudaSuccess);
-    cudaMemcpyAsync(d_a, a, nbytes, cudaMemcpyHostToDevice, 0);
+    
+    e = cudaMemcpyAsync(d_a.get(), a.get(), nbytes, cudaMemcpyHostToDevice, 0);
+    REQUIRE(e == cudaSuccess);
 
     dim3 threads = dim3(512, 1);
     dim3 blocks = dim3(n / threads.x, 1);
     int value = 26;
     
-    increment_kernel<<<blocks, threads, 0, 0>>>(d_a, value);
-    cudaMemcpyAsync(a, d_a, nbytes, cudaMemcpyDeviceToHost, 0);
+    increment_kernel<<<blocks, threads, 0, 0>>>(d_a.get(), value);
+    e = cudaGetLastError();
+    REQUIRE(e == cudaSuccess);
+
+    e = cudaMemcpyAsync(a.get(), d_a.get(), nbytes, cudaMemcpyDeviceToHost, 0);
+    REQUIRE(e == cudaSuccess);
     
     e = cudaEventRecord(stop, 0);
     REQUIRE(e == cudaSuccess);
@@ -372,16 +400,6 @@ TEST_CASE("asyncAPI") {
     e = cudaEventElapsedTime(&elapsed_time, start, stop);
     REQUIRE(e == cudaSuccess);
     printf("asyncAPI GPU elapsed time: %f ms\n", elapsed_time);
-
-    e = cudaEventDestroy(start);
-    REQUIRE(e == cudaSuccess);
-    e = cudaEventDestroy(stop);
-    REQUIRE(e == cudaSuccess);
-
-    e = cudaFreeHost(a);
-    REQUIRE(e == cudaSuccess);
-    e = cudaFree(d_a);
-    REQUIRE(e == cudaSuccess);
 }
 
 
@@ -459,14 +477,15 @@ __global__ void run_atomicCAS(int *d_myint)
 }
 
 TEST_CASE("atomicCAS") {
-    int* d_myint;
-    int myint;
+    DevicePtr<int> d_myint(1);
+    int myint = 0;
     
-    cudaMalloc(&d_myint, sizeof(int));
-    run_atomicCAS<<<1,1>>>(d_myint);
-    cudaDeviceSynchronize();
+    run_atomicCAS<<<1,1>>>(d_myint.get());
+    cudaError_t e = cudaDeviceSynchronize();
+    REQUIRE(e == cudaSuccess);
     
-    cudaMemcpy(&myint, d_myint, sizeof(int), cudaMemcpyDeviceToHost);
+    e = cudaMemcpy(&myint, d_myint.get(), sizeof(int), cudaMemcpyDeviceToHost);
+    REQUIRE(e == cudaSuccess);
     printf("%d\n", myint);
 }
 
@@ -565,36 +584,32 @@ TEST_CASE("cdpSimpleQuicksort") {
 
     cudaDeviceProp devprop;
     int dev = 0;
-    cudaGetDeviceProperties(&devprop, dev);
+    e = cudaGetDeviceProperties(&devprop, dev);
+    REQUIRE(e == cudaSuccess);
     printf("major %d minor %d\n", devprop.major, devprop.minor);
 
     int num_items = 128;
-    unsigned int *h_data = 0;
-    h_data = (unsigned int*) malloc(num_items * sizeof(unsigned int));
-    initialize_data(h_data, num_items);
+    std::vector<unsigned int> h_data(num_items);
+    initialize_data(h_data.data(), num_items);
 
-    unsigned int *d_data = 0;
-    e = cudaMalloc((void**)&d_data, num_items * sizeof(unsigned int));
-    REQUIRE(e == cudaSuccess);
-    e = cudaMemcpy(d_data, h_data, num_items * sizeof(unsigned int),
+    DevicePtr<unsigned int> d_data(num_items);
+    e = cudaMemcpy(d_data.get(), h_data.data(), num_items * sizeof(unsigned int),
             cudaMemcpyHostToDevice);
     REQUIRE(e == cudaSuccess);
 
-    run_qsort(d_data, num_items);
-    cudaDeviceSynchronize();
+    run_qsort(d_data.get(), num_items);
+    e = cudaDeviceSynchronize();
+    REQUIRE(e == cudaSuccess);
     e = cudaGetLastError();
     REQUIRE(e == cudaSuccess);
 
-    e = cudaMemcpy(h_data, d_data, num_items * sizeof(unsigned int),
+    e = cudaMemcpy(h_data.data(), d_data.get(), num_items * sizeof(unsigned int),
             cudaMemcpyDeviceToHost);
     REQUIRE(e == cudaSuccess);
 
     for (int i = 1; i < num_items; i++) {
         REQUIRE(h_data[i - 1] <= h_data[i]);
     }
-
-    cudaFree(d_data);
-    free(h_data);
 }
 
 TEST_CASE("vectoradd") {
@@ -602,64 +617,48 @@ TEST_CASE("vectoradd") {
     size_t size = num_elements * sizeof(float);
     printf("vector addition of %d elements\n", num_elements);
 
-    float *h_a = (float*) malloc(size);
-    float *h_b = (float*) malloc(size);
-    float *h_c = (float*) malloc(size);
-    REQUIRE(h_a != nullptr);
-    REQUIRE(h_b != nullptr);
-    REQUIRE(h_c != nullptr);
+    std::vector<float> h_a(num_elements);
+    std::vector<float> h_b(num_elements);
+    std::vector<float> h_c(num_elements);
 
     for (int i = 0; i < num_elements; ++i) {
         h_a[i] = rand() / (float) RAND_MAX;
         h_b[i] = rand() / (float) RAND_MAX;
     }
 
-    float *d_a = NULL;
-    float *d_b = NULL;
-    float *d_c = NULL;
-    cudaError_t e = cudaSuccess;
+    DevicePtr<float> d_a(num_elements);
+    DevicePtr<float> d_b(num_elements);
+    DevicePtr<float> d_c(num_elements);
 
-    e = cudaMalloc((void**)&d_a, size);
+    cudaError_t e = cudaMemcpy(d_a.get(), h_a.data(), size, cudaMemcpyHostToDevice);
     REQUIRE(e == cudaSuccess);
-    e = cudaMalloc((void**)&d_b, size);
-    REQUIRE(e == cudaSuccess);
-    e = cudaMalloc((void**)&d_c, size);
-    REQUIRE(e == cudaSuccess);
-
-    e = cudaMemcpy(d_a, h_a, size, cudaMemcpyHostToDevice);
-    REQUIRE(e == cudaSuccess);
-    e = cudaMemcpy(d_b, h_b, size, cudaMemcpyHostToDevice);
+    e = cudaMemcpy(d_b.get(), h_b.data(), size, cudaMemcpyHostToDevice);
     REQUIRE(e == cudaSuccess);
 
     int threadsPerBlock = 256;
     int blocksPerGrid = (num_elements + threadsPerBlock - 1) / threadsPerBlock;
-    cuda_vector_add<<<blocksPerGrid, threadsPerBlock>>>(d_c, d_a, d_b, num_elements);
+    cuda_vector_add<<<blocksPerGrid, threadsPerBlock>>>(d_c.get(), d_a.get(), d_b.get(), num_elements);
+    e = cudaGetLastError();
+    REQUIRE(e == cudaSuccess);
     
     e = cudaDeviceSynchronize();
     REQUIRE(e == cudaSuccess);
 
-    e = cudaMemcpy(h_c, d_c, size, cudaMemcpyDeviceToHost);
+    e = cudaMemcpy(h_c.data(), d_c.get(), size, cudaMemcpyDeviceToHost);
     REQUIRE(e == cudaSuccess);
 
     for (int i = 0; i < num_elements; ++i) {
         REQUIRE(fabs(h_c[i] - (h_a[i] + h_b[i])) < MAX_ERR);
     }
-
-    cudaFree(d_a);
-    cudaFree(d_b);
-    cudaFree(d_c);
-    free(h_a);
-    free(h_b);
-    free(h_c);
 }
 
 __global__ static void timed_reduction(const float *input, float *output,
-        clock_t *timer) {
+        long long *timer) {
     extern __shared__ float shared[];
     const int tid = threadIdx.x;
     const int bid = blockIdx.x;
 
-    if (tid == 0) timer[bid] = clock();
+    if (tid == 0) timer[bid] = clock64();
 
     shared[tid] = input[tid];
     shared[tid + blockDim.x] = input[tid + blockDim.x];
@@ -681,24 +680,29 @@ __global__ static void timed_reduction(const float *input, float *output,
 
     __syncthreads();
 
-    if (tid == 0) timer[bid + gridDim.x] = clock();
+    if (tid == 0) timer[bid + gridDim.x] = clock64();
 }
 
 TEST_CASE("clock") {
     int device_count = 0;
 
-    cudaGetDeviceCount(&device_count);
+    cudaError_t e = cudaGetDeviceCount(&device_count);
+    REQUIRE(e == cudaSuccess);
     printf("Device count: %d\n", device_count);
 
     int dev_id = 0;
     int compute_mode = 0;
     int major = 0;
     int minor = 0;
-    cudaSetDevice(dev_id);
+    e = cudaSetDevice(dev_id);
+    REQUIRE(e == cudaSuccess);
 
-    cudaDeviceGetAttribute(&compute_mode, cudaDevAttrComputeMode, dev_id);
-    cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, dev_id);
-    cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, dev_id);
+    e = cudaDeviceGetAttribute(&compute_mode, cudaDevAttrComputeMode, dev_id);
+    REQUIRE(e == cudaSuccess);
+    e = cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, dev_id);
+    REQUIRE(e == cudaSuccess);
+    e = cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, dev_id);
+    REQUIRE(e == cudaSuccess);
     printf("compute_mode %d major %d minor %d\n", compute_mode, major, minor);
 
     int num_cores = convert_smver2_cores(major, minor);
@@ -706,9 +710,11 @@ TEST_CASE("clock") {
 
     int mprocessor_count = 0;
     int clockrate = 0;
-    cudaDeviceGetAttribute(&mprocessor_count, cudaDevAttrMultiProcessorCount,
+    e = cudaDeviceGetAttribute(&mprocessor_count, cudaDevAttrMultiProcessorCount,
             dev_id);
-    cudaDeviceGetAttribute(&clockrate, cudaDevAttrClockRate, dev_id);
+    REQUIRE(e == cudaSuccess);
+    e = cudaDeviceGetAttribute(&clockrate, cudaDevAttrClockRate, dev_id);
+    REQUIRE(e == cudaSuccess);
     printf("mprocessor count: %d\n", mprocessor_count);
     printf("clockrate: %d\n", clockrate);
 
@@ -718,31 +724,29 @@ TEST_CASE("clock") {
     const int NUM_THREADS = 256;
     const int NUM_BLOCKS = 64;
     
-    clock_t timer[NUM_BLOCKS * 2];
-    float input[NUM_THREADS * 2];
-    clock_t *dtimer = NULL;
-    float *dinput = NULL;
-    float *doutput = NULL;
+    long long timer[NUM_BLOCKS * 2];
+    std::vector<float> input(NUM_THREADS * 2);
 
     for (int i = 0; i < NUM_THREADS * 2; i++) {
         input[i] = (float)i;
     }
 
     // alloc mem
-    cudaMalloc((void **)&dinput, sizeof(float) * NUM_THREADS * 2);
-    cudaMalloc((void **)&doutput, sizeof(float) * NUM_BLOCKS);
-    cudaMalloc((void **)&dtimer, sizeof(clock_t) * NUM_BLOCKS * 2);
+    DevicePtr<float> dinput(NUM_THREADS * 2);
+    DevicePtr<float> doutput(NUM_BLOCKS);
+    DevicePtr<long long> dtimer(NUM_BLOCKS * 2);
     
-    cudaMemcpy(dinput, input, sizeof(float) * NUM_THREADS * 2, 
+    e = cudaMemcpy(dinput.get(), input.data(), sizeof(float) * NUM_THREADS * 2, 
                cudaMemcpyHostToDevice);
-    timed_reduction<<<NUM_BLOCKS, NUM_THREADS, sizeof(float) * 2 * NUM_THREADS>>> (dinput, doutput, dtimer);
+    REQUIRE(e == cudaSuccess);
 
-    cudaMemcpy(timer, dtimer, sizeof(clock_t) * NUM_BLOCKS * 2,
+    timed_reduction<<<NUM_BLOCKS, NUM_THREADS, sizeof(float) * 2 * NUM_THREADS>>> (dinput.get(), doutput.get(), dtimer.get());
+    e = cudaGetLastError();
+    REQUIRE(e == cudaSuccess);
+
+    e = cudaMemcpy(timer, dtimer.get(), sizeof(long long) * NUM_BLOCKS * 2,
             cudaMemcpyDeviceToHost);
-
-    cudaFree(dinput);
-    cudaFree(doutput);
-    cudaFree(dtimer);
+    REQUIRE(e == cudaSuccess);
 
     long double avg_elpased_clocks = 0;
     for (int i = 0; i < NUM_BLOCKS; i++) {
@@ -757,85 +761,42 @@ TEST_CASE("s_vectorAdd") {
     cudaError_t err = cudaSuccess;
     int num_elements = 50000;
     size_t size = num_elements * sizeof(float);
-    float *h_A = (float *)malloc(size);
-    float *h_B = (float *)malloc(size);
-    float *h_C = (float *)malloc(size);
-
-    if (h_A == NULL || h_B == NULL || h_C == NULL) {
-        fprintf(stderr, "Failed to allocate host vectors!\n");
-        exit(EXIT_FAILURE);
-    }
+    
+    std::vector<float> h_A(num_elements);
+    std::vector<float> h_B(num_elements);
+    std::vector<float> h_C(num_elements);
 
     for (int i = 0; i < num_elements; ++i) {
         h_A[i] = rand()/(float)RAND_MAX;
         h_B[i] = rand()/(float)RAND_MAX;
     }
 
-    float *d_A = NULL;
-    err = cudaMalloc((void **)&d_A, size);
-    if (err != cudaSuccess) {
-        fprintf(stderr, "Failed to allocate device vector A "
-                "(error code %s)!\n", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-
-    float *d_B = NULL;
-    err = cudaMalloc((void **)&d_B, size);
-    if (err != cudaSuccess) {
-        fprintf(stderr, "Failed to allocate device vector B "
-                "(error code %s)!\n", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-
-    float *d_C = NULL;
-    err = cudaMalloc((void **)&d_C, size);
-    if (err != cudaSuccess) {
-        fprintf(stderr, "Failed to allocate device vector C "
-                "(error code %s)!\n", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
+    DevicePtr<float> d_A(num_elements);
+    DevicePtr<float> d_B(num_elements);
+    DevicePtr<float> d_C(num_elements);
 
     printf("copy input data from host memory to CUDA device\n");
-    err = cudaMemcpy(d_A, h_A, size, cudaMemcpyHostToDevice);
-    if (err != cudaSuccess) {
-        fprintf(stderr, "Failed to copy vector A from host to device "
-                "(error code %s)!\n", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
+    err = cudaMemcpy(d_A.get(), h_A.data(), size, cudaMemcpyHostToDevice);
+    REQUIRE(err == cudaSuccess);
 
-    err = cudaMemcpy(d_B, h_B, size, cudaMemcpyHostToDevice);
-    if (err != cudaSuccess) {
-        fprintf(stderr, "Failed to copy vector B from host to device "
-                "(error code %s)!\n", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
+    err = cudaMemcpy(d_B.get(), h_B.data(), size, cudaMemcpyHostToDevice);
+    REQUIRE(err == cudaSuccess);
 
     int threadsPerBlock = 256;
     int blocksPerGrid = (num_elements + threadsPerBlock - 1) / threadsPerBlock;
-    cuda_vector_add<<<blocksPerGrid, threadsPerBlock>>>(d_C, d_A, d_B, num_elements);
+    cuda_vector_add<<<blocksPerGrid, threadsPerBlock>>>(d_C.get(), d_A.get(), d_B.get(), num_elements);
+    err = cudaGetLastError();
+    REQUIRE(err == cudaSuccess);
     
     err = cudaDeviceSynchronize();
-    if (err != cudaSuccess) {
-        fprintf(stderr, "Failed to synchronize device (error code %s)!\n", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
+    REQUIRE(err == cudaSuccess);
 
-    err = cudaMemcpy(h_C, d_C, size, cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess) {
-        fprintf(stderr, "Failed to copy vector C from device to host (error code %s)!\n", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
+    err = cudaMemcpy(h_C.data(), d_C.get(), size, cudaMemcpyDeviceToHost);
+    REQUIRE(err == cudaSuccess);
 
     for (int i = 0; i < num_elements; ++i) {
         REQUIRE(fabs(h_C[i] - (h_A[i] + h_B[i])) < MAX_ERR);
     }
-
-    cudaFree(d_A);
-    cudaFree(d_B);
-    cudaFree(d_C);
-    free(h_A);
-    free(h_B);
-    free(h_C);
 }
 
 TEST_CASE("max_n_block_thread") {
@@ -878,8 +839,9 @@ TEST_CASE("simple_assert") {
     printf("\nEnd assert\n");
 
     if (error == cudaErrorAssert) {
-        printf("Device assert failed as expected, "
-               "CUDA error message: %s\n", cudaGetErrorString(error));
+        printf("Device assert failed as expected, CUDA error message: %s\n", cudaGetErrorString(error));
+        // Reset device to clean up the assertion state for subsequent runs/tests
+        cudaDeviceReset();
     }
 }
 
