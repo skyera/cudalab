@@ -852,5 +852,32 @@ TEST_CASE("device") {
     int device_count = 0;
     cudaError_t e = cudaGetDeviceCount(&device_count);
     REQUIRE(e == cudaSuccess);
-    printf("device_count: %d\n", device_count);
+    printf("Number of CUDA devices: %d\n\n", device_count);
+
+    for (int i = 0; i < device_count; ++i) {
+        cudaDeviceProp prop;
+        e = cudaGetDeviceProperties(&prop, i);
+        REQUIRE(e == cudaSuccess);
+
+        printf("Device %d: \"%s\"\n", i, prop.name);
+        printf("  Compute Capability:          %d.%d\n", prop.major, prop.minor);
+        printf("  Total Global Memory:         %.2f GB (%llu bytes)\n", 
+               (double)prop.totalGlobalMem / (1024.0 * 1024.0 * 1024.0), 
+               (unsigned long long)prop.totalGlobalMem);
+        printf("  Multiprocessors (SMs):       %d\n", prop.multiProcessorCount);
+        printf("  GPU Max Clock Rate:          %.0f MHz (%d kHz)\n", 
+               (double)prop.clockRate / 1000.0, prop.clockRate);
+        printf("  L2 Cache Size:               %d bytes\n", prop.l2CacheSize);
+        printf("  Total Constant Memory:       %zu bytes\n", prop.totalConstMem);
+        printf("  Shared Memory per Block:     %zu bytes\n", prop.sharedMemPerBlock);
+        printf("  Registers per Block:         %d\n", prop.regsPerBlock);
+        printf("  Warp Size:                   %d\n", prop.warpSize);
+        printf("  Max Threads per Block:       %d\n", prop.maxThreadsPerBlock);
+        printf("  Max Block Dimensions:        [%d, %d, %d]\n", 
+               prop.maxThreadsDim[0], prop.maxThreadsDim[1], prop.maxThreadsDim[2]);
+        printf("  Max Grid Dimensions:         [%d, %d, %d]\n", 
+               prop.maxGridSize[0], prop.maxGridSize[1], prop.maxGridSize[2]);
+        printf("\n");
+    }
 }
+
