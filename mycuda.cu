@@ -757,19 +757,31 @@ TEST_CASE("s_vectorAdd") {
     err = cudaMalloc((void **)&d_C, size);
     if (err != cudaSuccess) {
         fprintf(stderr, "Failed to allocate device vector C "
-                "(error code %s)!]n", cudaGetErrorString(err));
+                "(error code %s)!\n", cudaGetErrorString(err));
         exit(EXIT_FAILURE);
     }
 
     printf("copy input data from host memory to CUDA device\n");
     err = cudaMemcpy(d_A, h_A, size, cudaMemcpyHostToDevice);
     if (err != cudaSuccess) {
-        fprintf(stderr, "Failed top copy vector A from host to device "
+        fprintf(stderr, "Failed to copy vector A from host to device "
                 "(error code %s)!\n", cudaGetErrorString(err));
         exit(EXIT_FAILURE);
     }
 
     err = cudaMemcpy(d_B, h_B, size, cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "Failed to copy vector B from host to device "
+                "(error code %s)!\n", cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_C);
+    free(h_A);
+    free(h_B);
+    free(h_C);
 }
 
 TEST_CASE("max_n_block_thread") {
