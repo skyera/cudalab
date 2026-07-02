@@ -222,6 +222,8 @@ ifeq ($(dbg),1)
       NVCCFLAGS += -g -G
       BUILD_TYPE := debug
 else
+      NVCCFLAGS += -O3
+      CCFLAGS   += -O3
       BUILD_TYPE := release
 endif
 
@@ -307,10 +309,18 @@ endif
 
 ################################################################################
 
+.PHONY: all build debug run-debug check.deps run clean clobber help
+
 # Target rules
 all: build
 
 build: cuda_test
+
+debug:
+	$(MAKE) dbg=1 build
+
+run-debug:
+	$(MAKE) dbg=1 run
 
 check.deps:
 ifeq ($(SAMPLE_ENABLED),0)
@@ -326,9 +336,18 @@ cuda_test: mycuda.o
 	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
 run: build
-	$(EXEC) ./cuda_test
+	$(EXEC) ./cuda_test $(ARGS)
 
 clean:
 	rm -f cuda_test mycuda.o
 
 clobber: clean
+
+help:
+	@echo "Available targets:"
+	@echo "  build/all   - Compile release version of 'cuda_test' binary"
+	@echo "  debug       - Compile debug version of 'cuda_test' binary"
+	@echo "  run         - Compile and run release version (supports ARGS, e.g. 'make run ARGS=\"-tc=bench\"')"
+	@echo "  run-debug   - Compile and run debug version (supports ARGS)"
+	@echo "  clean       - Remove compiled executables and object files"
+	@echo "  help        - Show this help message"
