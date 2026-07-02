@@ -57,6 +57,11 @@ inline int convert_smver2_cores(int major, int minor) {
       {0x70,  64},
       {0x72,  64},
       {0x75,  64},
+      {0x80,  64},
+      {0x86, 128},
+      {0x87, 128},
+      {0x89, 128},
+      {0x90, 128},
       {-1, -1}};
 
     int index = 0;
@@ -243,6 +248,11 @@ const char* get_arch_name(int major, int minor) {
       {0x70, "Volta"},
       {0x72, "Xavier"},
       {0x75, "Turing"},
+      {0x80, "Ampere"},
+      {0x86, "Ampere"},
+      {0x87, "Ampere"},
+      {0x89, "Ada Lovelace"},
+      {0x90, "Hopper"},
       {-1, "Graphics Device"}};
         
     int i;
