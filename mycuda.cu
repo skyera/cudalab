@@ -113,6 +113,7 @@ inline int convert_smver2_cores(int major, int minor) {
       {0x87, 128},
       {0x89, 128},
       {0x90, 128},
+      {0xa0, 128},
       {-1, -1}};
 
     int index = 0;
@@ -283,6 +284,7 @@ const char* get_arch_name(int major, int minor) {
       {0x87, "Ampere"},
       {0x89, "Ada Lovelace"},
       {0x90, "Hopper"},
+      {0xa0, "Blackwell"},
       {-1, "Graphics Device"}};
         
     int i;
@@ -329,16 +331,12 @@ TEST_CASE("getdevice") {
 void print_devprop(const cudaDeviceProp& devprop) {
     std::cout << "name: " << devprop.name << "\n"
         << "ECCEnabled: " << devprop.ECCEnabled << "\n";
-#if CUDART_VERSION < 12000
-    std::cout << "clockRate: " << devprop.clockRate << "\n";
-#else
     int clockRate = 0;
     int dev_id = 0;
     if (cudaGetDevice(&dev_id) == cudaSuccess) {
         cudaDeviceGetAttribute(&clockRate, cudaDevAttrClockRate, dev_id);
     }
     std::cout << "clockRate: " << clockRate << "\n";
-#endif
     std::cout << "l2CacheSize: " << devprop.l2CacheSize << "\n";
 }
 
@@ -458,11 +456,13 @@ TEST_CASE("cdpSimplePrint") {
     }
     printf("=%d blocks are launched(%d from the GPU)\n", sum, sum-2);
 
-    cudaDeviceSetLimit(cudaLimitDevRuntimeSyncDepth, max_depth);
-    cdp_kernel<<<2,2>>>(max_depth, 0, 0, -1);
-    cudaError_t e = cudaGetLastError();
+    cudaError_t e = cudaDeviceSetLimit(cudaLimitDevRuntimeSyncDepth, max_depth);
     REQUIRE(e == cudaSuccess);
-    cudaDeviceSynchronize();
+    cdp_kernel<<<2,2>>>(max_depth, 0, 0, -1);
+    e = cudaGetLastError();
+    REQUIRE(e == cudaSuccess);
+    e = cudaDeviceSynchronize();
+    REQUIRE(e == cudaSuccess);
 }
 
 
@@ -568,7 +568,8 @@ void initialize_data(unsigned int *dst, unsigned int nitems)
 
 void run_qsort(unsigned int *data, unsigned int nitems)
 {
-    cudaDeviceSetLimit(cudaLimitDevRuntimeSyncDepth, MAX_DEPTH);
+    cudaError_t e = cudaDeviceSetLimit(cudaLimitDevRuntimeSyncDepth, MAX_DEPTH);
+    REQUIRE(e == cudaSuccess);
     int left = 0;
     int right = nitems - 1;
     cdp_simple_quicksort<<<1, 1>>>(data, left, right, 0);
@@ -801,10 +802,12 @@ TEST_CASE("s_vectorAdd") {
 
 TEST_CASE("max_n_block_thread") {
     cudaDeviceProp prop;
-    int device;
+    int device = 0;
 
-    cudaGetDevice(&device);
-    cudaGetDeviceProperties(&prop, device);
+    cudaError_t e = cudaGetDevice(&device);
+    REQUIRE(e == cudaSuccess);
+    e = cudaGetDeviceProperties(&prop, device);
+    REQUIRE(e == cudaSuccess);
     std::cout << "Device Name: " << prop.name << std::endl;
     std::cout << "Max Threads per Block: " << prop.maxThreadsPerBlock << std::endl;
     std::cout << "Max Threads Dimension (x, y, z): "
@@ -847,7 +850,7 @@ TEST_CASE("simple_assert") {
 
 TEST_CASE("device") {
     int device_count = 0;
-
-    cudaGetDeviceCount(&device_count);
+    cudaError_t e = cudaGetDeviceCount(&device_count);
+    REQUIRE(e == cudaSuccess);
     printf("device_count: %d\n", device_count);
 }
