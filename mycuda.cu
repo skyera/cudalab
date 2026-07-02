@@ -605,6 +605,9 @@ TEST_CASE("vectoradd") {
     float *h_a = (float*) malloc(size);
     float *h_b = (float*) malloc(size);
     float *h_c = (float*) malloc(size);
+    REQUIRE(h_a != nullptr);
+    REQUIRE(h_b != nullptr);
+    REQUIRE(h_c != nullptr);
 
     for (int i = 0; i < num_elements; ++i) {
         h_a[i] = rand() / (float) RAND_MAX;
@@ -612,15 +615,39 @@ TEST_CASE("vectoradd") {
     }
 
     float *d_a = NULL;
+    float *d_b = NULL;
+    float *d_c = NULL;
     cudaError_t e = cudaSuccess;
 
     e = cudaMalloc((void**)&d_a, size);
-    if (e != cudaSuccess) {
-        printf("failed to allocate device mem: %s\n", cudaGetErrorString(e));
-    }
+    REQUIRE(e == cudaSuccess);
+    e = cudaMalloc((void**)&d_b, size);
+    REQUIRE(e == cudaSuccess);
+    e = cudaMalloc((void**)&d_c, size);
     REQUIRE(e == cudaSuccess);
 
+    e = cudaMemcpy(d_a, h_a, size, cudaMemcpyHostToDevice);
+    REQUIRE(e == cudaSuccess);
+    e = cudaMemcpy(d_b, h_b, size, cudaMemcpyHostToDevice);
+    REQUIRE(e == cudaSuccess);
+
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (num_elements + threadsPerBlock - 1) / threadsPerBlock;
+    cuda_vector_add<<<blocksPerGrid, threadsPerBlock>>>(d_c, d_a, d_b, num_elements);
+    
+    e = cudaDeviceSynchronize();
+    REQUIRE(e == cudaSuccess);
+
+    e = cudaMemcpy(h_c, d_c, size, cudaMemcpyDeviceToHost);
+    REQUIRE(e == cudaSuccess);
+
+    for (int i = 0; i < num_elements; ++i) {
+        REQUIRE(fabs(h_c[i] - (h_a[i] + h_b[i])) < MAX_ERR);
+    }
+
     cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
     free(h_a);
     free(h_b);
     free(h_c);
@@ -781,6 +808,26 @@ TEST_CASE("s_vectorAdd") {
         fprintf(stderr, "Failed to copy vector B from host to device "
                 "(error code %s)!\n", cudaGetErrorString(err));
         exit(EXIT_FAILURE);
+    }
+
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (num_elements + threadsPerBlock - 1) / threadsPerBlock;
+    cuda_vector_add<<<blocksPerGrid, threadsPerBlock>>>(d_C, d_A, d_B, num_elements);
+    
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        fprintf(stderr, "Failed to synchronize device (error code %s)!\n", cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    err = cudaMemcpy(h_C, d_C, size, cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "Failed to copy vector C from device to host (error code %s)!\n", cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    for (int i = 0; i < num_elements; ++i) {
+        REQUIRE(fabs(h_C[i] - (h_A[i] + h_B[i])) < MAX_ERR);
     }
 
     cudaFree(d_A);
