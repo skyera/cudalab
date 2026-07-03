@@ -924,3 +924,55 @@ TEST_CASE("double_array") {
     cudaFree(d_data);
 }
 
+__global__ void reverse_array_kernel(float *d_out, const float *d_in,
+        int n) {
+    __shared__ float shared_temp[8];
+
+    int idx = threadIdx.x;
+
+    if (idx < n) {
+        shared_temp[idx] = d_in[idx];
+    }
+    __syncthreads();
+
+    if (idx < n) {
+        int reverse_idx = n - 1 - idx;
+        d_out[idx] = shared_temp[reverse_idx];
+    }
+}
+
+TEST_CASE("sync") {
+    const int N_data = 8;
+    const size_t size = N_data * sizeof(float);
+
+    float h_in[N_data] = {10.0f, 20.0f, 30.0f, 40.0f, 50.0f, 60.0f, 
+        70.0f, 80.0f};
+    float h_out[N_data] = {0.0f};
+
+    std::cout << "Input array: ";
+    for (int i = 0; i < N_data; i++) {
+        std::cout << h_in[i] << " ";
+    }
+    std::cout << "\n";
+
+    float *d_in = nullptr;
+    float *d_out = nullptr;
+    cudaMalloc(&d_in, size);
+    cudaMalloc(&d_out, size);
+
+    cudaMemcpy(d_in, h_in, size, cudaMemcpyHostToDevice);
+
+    reverse_array_kernel<<<1, N_data>>>(d_out, d_in, N_data);
+    cudaDeviceSynchronize();
+    cudaMemcpy(h_out, d_out, size, cudaMemcpyDeviceToHost);
+
+    std::cout << "Output array: ";
+    for (int i = 0; i < N_data; i++) {
+        std::cout << h_out[i] << " ";
+    }
+    std::cout << "\n";
+
+    cudaFree(d_in);
+    cudaFree(d_out);
+}
+
