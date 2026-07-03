@@ -884,3 +884,43 @@ TEST_CASE("device") {
     }
 }
 
+__global__ void double_array(float *data, int n) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index < n) {
+        data[index] = data[index] * 2.0f;
+    }
+}
+
+TEST_CASE("double_array") {
+    const int N_data = 5;
+    const size_t size = N_data * sizeof(float);
+
+    float h_data[N_data] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    std::cout << "Original CPU data";
+    for (int i = 0; i < N_data; i++) {
+        std::cout << h_data[i] << " ";
+    }
+    std::cout << "\n";
+
+    float *d_data = nullptr;
+    cudaMalloc(&d_data, size);
+
+    cudaMemcpy(d_data, h_data, size, cudaMemcpyHostToDevice);
+
+    int threads_per_block = 256;
+    int blocks_per_grid = (N_data + threads_per_block - 1) / threads_per_block;
+
+    double_array<<<blocks_per_grid, threads_per_block>>>(d_data, N_data);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(h_data, d_data, size, cudaMemcpyDeviceToHost);
+
+    std::cout << "Doubled CPU data: ";
+    for (int i = 0; i < N_data; i++) {
+        std::cout << h_data[i] << " ";
+    }
+    std::cout << "\n";
+
+    cudaFree(d_data);
+}
+
