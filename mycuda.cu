@@ -15,6 +15,12 @@
 #include <memory>
 #include <stdexcept>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "third_party/stb/stb_image.h"
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "third_party/stb/stb_image_write.h"
+
 template <typename T>
 struct DevicePtr {
     T* ptr = nullptr;
@@ -974,5 +980,24 @@ TEST_CASE("sync") {
 
     cudaFree(d_in);
     cudaFree(d_out);
+}
+
+TEST_CASE("blur") {
+    const char *input_path = "test_pattern.jpg";
+    const char *output_path = "blurred_pattern.jpg";
+
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    unsigned char *h_in = stbi_load(input_path, &width, &height, 
+            &channels, 1);
+    if (!h_in) {
+        std::cerr << "Error: Could not load input image: "
+            << input_path << "\n";
+        return;
+    }
+
+    std::cout << "Loaded image: " << input_path << " (" << width
+        << "x" << height << ", original chanels: " << channels << ")\n";
 }
 
