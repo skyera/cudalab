@@ -335,11 +335,17 @@ mycuda.o:mycuda.cu
 cuda_test: mycuda.o
 	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
+image_blur.o:image_blur.cu
+	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
+image_blur: image_blur.o
+	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
+
 run: build
 	$(EXEC) ./cuda_test $(ARGS)
 
 clean:
-	rm -f cuda_test mycuda.o
+	rm -f cuda_test mycuda.o image_blur image_blur.o blurred_pattern.jpg
 
 clobber: clean
 
