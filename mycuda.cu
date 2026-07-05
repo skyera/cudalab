@@ -150,18 +150,6 @@ __global__ void cuda_vector_add(float *out, float *a, float *b, int n) {
     }
 }
 
-TEST_CASE("cpu_vector_add") {
-    std::vector<float> a(N, 1.0f);
-    std::vector<float> b(N, 2.0f);
-    std::vector<float> out(N, 0.0f);
-
-    Timer timer;
-    timer.start();
-    cpu_vector_add(out.data(), a.data(), b.data(), N);
-    timer.stop();
-    printf("cpu_vector_add N %d %f seconds\n", N, timer.elapsed_seconds());
-}
-
 void do_cuda_vector_add(int n_block, int n_thread) {
     cudaError_t e;
 
@@ -174,8 +162,17 @@ void do_cuda_vector_add(int n_block, int n_thread) {
 
     std::vector<float> a(num_elements, 1.0f);
     std::vector<float> b(num_elements, 2.0f);
-    std::vector<float> out(num_elements, 0.0f);
+    std::vector<float> out_gpu(num_elements, 0.0f);
+    std::vector<float> out_cpu(num_elements, 0.0f);
 
+    // 1. Run and time CPU version
+    Timer cpu_timer;
+    cpu_timer.start();
+    cpu_vector_add(out_cpu.data(), a.data(), b.data(), num_elements);
+    cpu_timer.stop();
+    double cpu_time = cpu_timer.elapsed_seconds();
+
+    // 2. Run and time GPU version
     DevicePtr<float> d_a(num_elements);
     DevicePtr<float> d_b(num_elements);
     DevicePtr<float> d_out(num_elements);
@@ -185,24 +182,28 @@ void do_cuda_vector_add(int n_block, int n_thread) {
     e = cudaMemcpy(d_b.get(), b.data(), sizeof(float) * num_elements, cudaMemcpyHostToDevice);
     REQUIRE(e == cudaSuccess);
 
-    Timer timer;
-    timer.start();
+    Timer gpu_timer;
+    gpu_timer.start();
     cuda_vector_add<<<n_block, n_thread>>>(d_out.get(), d_a.get(), d_b.get(), num_elements);
     e = cudaGetLastError();
     REQUIRE(e == cudaSuccess);
     
     e = cudaDeviceSynchronize();
     REQUIRE(e == cudaSuccess);
-    timer.stop();
-    printf("cuda_vector_add N: %d <<<%d, %d>>> %f: seconds\n", num_elements,
-            n_block, n_thread, timer.elapsed_seconds());
+    gpu_timer.stop();
+    double gpu_time = gpu_timer.elapsed_seconds();
 
-    e = cudaMemcpy(out.data(), d_out.get(), sizeof(float) * num_elements, cudaMemcpyDeviceToHost);
+    printf("Vector Add (%d elements) <<<%d, %d>>>:\n", num_elements, n_block, n_thread);
+    printf("  CPU Time: %f seconds\n", cpu_time);
+    printf("  GPU Time: %f seconds\n", gpu_time);
+    printf("  Speedup:  %fx\n", cpu_time / gpu_time);
+
+    e = cudaMemcpy(out_gpu.data(), d_out.get(), sizeof(float) * num_elements, cudaMemcpyDeviceToHost);
     REQUIRE(e == cudaSuccess);
     
     for (int i = 0; i < num_elements; i++) {
-        INFO("i = ", i, " out=", out[i], " a=", a[i], " b=", b[i]);
-        REQUIRE(fabs(out[i] - a[i] - b[i]) < MAX_ERR);
+        INFO("i = ", i, " out_gpu=", out_gpu[i], " out_cpu=", out_cpu[i]);
+        REQUIRE(fabs(out_gpu[i] - out_cpu[i]) < MAX_ERR);
     }
 }
 
