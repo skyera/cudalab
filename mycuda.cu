@@ -226,7 +226,7 @@ TEST_CASE("cuda_vector_add_256_1024") {
     do_cuda_vector_add(256, 1024);
 }
 
-TEST_CASE("bench") {
+TEST_CASE("bench_cpu_double_precision") {
     double d = 1.0;
     ankerl::nanobench::Bench().run("some double ops", [&] {
         d += 1.0/d;
@@ -242,7 +242,7 @@ __global__ void cuda_hello()
     printf("Hello world from GPU\n");
 }
 
-TEST_CASE("hello") {
+TEST_CASE("hello_world_gpu") {
     cuda_hello<<<1,1>>>();
     cudaDeviceSynchronize();
     REQUIRE(cudaGetLastError() == cudaSuccess);
@@ -255,7 +255,7 @@ TEST_CASE("device_count") {
     std::cout << "device count: " << count << "\n";
 }
 
-TEST_CASE("compute_mode") {
+TEST_CASE("device_compute_mode") {
     int compute_mode = -1;
     int curr_dev = 0;
     
@@ -304,7 +304,7 @@ const char* get_arch_name(int major, int minor) {
     return arch_names[i].name;
 }
 
-TEST_CASE("major_minor") {
+TEST_CASE("device_compute_capability") {
     int major = 0;
     int minor = 0;
     int curr_dev = 0;
@@ -326,7 +326,7 @@ TEST_CASE("major_minor") {
     std::cout << "last cuda error: " << err << "\n";
 }
 
-TEST_CASE("getdevice") {
+TEST_CASE("device_get_current") {
     int dev=0;
     
     cudaError_t e = cudaGetDevice(&dev);
@@ -346,7 +346,7 @@ void print_devprop(const cudaDeviceProp& devprop) {
     std::cout << "l2CacheSize: " << devprop.l2CacheSize << "\n";
 }
 
-TEST_CASE("devprop") {
+TEST_CASE("device_print_properties") {
     int dev = 0;
     cudaDeviceProp devprop;
 
@@ -619,7 +619,7 @@ TEST_CASE("cdpSimpleQuicksort") {
     }
 }
 
-TEST_CASE("vectoradd") {
+TEST_CASE("vector_add_clock_cycles") {
     int num_elements = 50000;
     size_t size = num_elements * sizeof(float);
     printf("vector addition of %d elements\n", num_elements);
@@ -764,7 +764,7 @@ TEST_CASE("clock") {
     printf("Average clocks/block = %Lf\n", avg_elpased_clocks);
 }
 
-TEST_CASE("s_vectorAdd") {
+TEST_CASE("vector_add_device_ptr") {
     cudaError_t err = cudaSuccess;
     int num_elements = 50000;
     size_t size = num_elements * sizeof(float);
@@ -828,7 +828,7 @@ TEST_CASE("max_n_block_thread") {
 
 
 
-TEST_CASE("device") {
+TEST_CASE("device_properties") {
     int device_count = 0;
     cudaError_t e = cudaGetDeviceCount(&device_count);
     REQUIRE(e == cudaSuccess);
@@ -921,7 +921,7 @@ __global__ void reverse_array_kernel(float *d_out, const float *d_in,
     }
 }
 
-TEST_CASE("sync") {
+TEST_CASE("shared_mem_reverse_sync") {
     const int N_data = 8;
     const size_t size = N_data * sizeof(float);
 
@@ -956,7 +956,7 @@ TEST_CASE("sync") {
     cudaFree(d_out);
 }
 
-TEST_CASE("blur") {
+TEST_CASE("image_box_blur_test") {
     const char *input_path = "test_pattern.jpg";
     const char *output_path = "blurred_pattern.jpg";
 
