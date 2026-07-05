@@ -314,7 +314,7 @@ endif
 # Target rules
 all: build
 
-build: cuda_test
+build: cuda_test image_blur
 
 debug:
 	$(MAKE) dbg=1 build
