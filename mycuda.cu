@@ -1001,3 +1001,103 @@ TEST_CASE("blur") {
         << "x" << height << ", original chanels: " << channels << ")\n";
 }
 
+__global__ void reverse_blocks_gpu(float *d_out, const float *d_in, int n) {
+    extern __shared__ float s_data[];
+
+    int g_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int l_idx = threadIdx.x;
+
+    if (g_idx < n) {
+        s_data[l_idx] = d_in[g_idx];
+    }
+    __syncthreads();
+
+    if (g_idx < n) {
+        int current_block_size = blockDim.x;
+        if ((blockIdx.x + 1) * blockDim.x > n) {
+            current_block_size = n - (blockIdx.x * blockDim.x);
+        }
+
+        int rev_l_idx = current_block_size - 1 - l_idx;
+        d_out[g_idx] = s_data[rev_l_idx];
+    }
+}
+
+void reverse_blocks_cpu(float *h_out, const float *h_in, int n, int block_size) {
+    for (int b = 0; b < n; b += block_size) {
+        int current_block_size = block_size;
+        if (b + block_size > n) {
+            current_block_size = n - b;
+        }
+        for (int i = 0; i < current_block_size; i++) {
+            h_out[b + i] = h_in[b + current_block_size - 1 - i];
+        }
+    }
+}
+
+TEST_CASE("reverse_bench") {
+    const int N_data = 10000000;
+    const size_t size = N_data * sizeof(float);
+    const int block_size = 256;
+
+    std::cout << "Initializing " << N_data << " elements for reverse benchmark...\n";
+
+    std::vector<float> h_in(N_data);
+    std::vector<float> h_out_cpu(N_data, 0.0f);
+    std::vector<float> h_out_gpu(N_data, 0.0f);
+
+    for (int i = 0; i < N_data; i++) {
+        h_in[i] = (float)i;
+    }
+
+    // Benchmark CPU
+    std::cout << "Running CPU Segmented Reverse...\n";
+    auto cpu_start = std::chrono::high_resolution_clock::now();
+    reverse_blocks_cpu(h_out_cpu.data(), h_in.data(), N_data, block_size);
+    auto cpu_end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> cpu_duration = cpu_end - cpu_start;
+    std::cout << "CPU Time: " << cpu_duration.count() << " ms\n";
+
+    // Allocate GPU Memory
+    float *d_in = nullptr;
+    float *d_out = nullptr;
+    cudaMalloc(&d_in, size);
+    cudaMalloc(&d_out, size);
+
+    cudaMemcpy(d_in, h_in.data(), size, cudaMemcpyHostToDevice);
+
+    int threadsPerBlock = block_size;
+    int blocksPerGrid = (N_data + threadsPerBlock - 1) / threadsPerBlock;
+    size_t sharedMemBytes = threadsPerBlock * sizeof(float);
+
+    // Warm up
+    reverse_blocks_gpu<<<blocksPerGrid, threadsPerBlock, sharedMemBytes>>>(d_out, d_in, N_data);
+    cudaDeviceSynchronize();
+
+    // Benchmark GPU
+    std::cout << "Running GPU Segmented Reverse...\n";
+    auto gpu_start = std::chrono::high_resolution_clock::now();
+    reverse_blocks_gpu<<<blocksPerGrid, threadsPerBlock, sharedMemBytes>>>(d_out, d_in, N_data);
+    cudaDeviceSynchronize();
+    auto gpu_end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> gpu_duration = gpu_end - gpu_start;
+    std::cout << "GPU Time (Kernel only): " << gpu_duration.count() << " ms\n";
+
+    cudaMemcpy(h_out_gpu.data(), d_out, size, cudaMemcpyDeviceToHost);
+
+    // Verify
+    bool success = true;
+    for (int i = 0; i < N_data; i++) {
+        if (std::abs(h_out_cpu[i] - h_out_gpu[i]) > 1e-5) {
+            success = false;
+            std::cout << "Mismatch at " << i << ": CPU=" << h_out_cpu[i] << ", GPU=" << h_out_gpu[i] << "\n";
+            break;
+        }
+    }
+
+    REQUIRE(success == true);
+    std::cout << "Verification SUCCESS! Speedup: " << (cpu_duration.count() / gpu_duration.count()) << "x\n";
+
+    cudaFree(d_in);
+    cudaFree(d_out);
+}
