@@ -247,7 +247,7 @@ ALL_LDFLAGS += $(addprefix -Xlinker ,$(LDFLAGS))
 ALL_LDFLAGS += $(addprefix -Xlinker ,$(EXTRA_LDFLAGS))
 
 # Common includes and paths for CUDA
-INCLUDES  := -Ithird_party/doctest/doctest -Ithird_party/nanobench/src/include
+INCLUDES  := -isystem third_party/doctest/doctest -isystem third_party/nanobench/src/include -isystem third_party/stb
 LIBRARIES :=
 
 ################################################################################
