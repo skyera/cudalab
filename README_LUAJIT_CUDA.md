@@ -88,7 +88,32 @@ An iconic 80s Retrowave / Synthwave endless flight simulation:
 
 ---
 
-### 4. `mandelbrot_demo.lua`: GPU Fractal Explorer
+### 4. `galaxy3d.lua`: 100,000+ Star 3D Spiral Galaxy Simulator
+Simulates and renders a realistic 3D spiral galaxy with 120,000+ stars entirely on the GPU:
+- **Features**:
+  - Realistic Vera Rubin flat galactic rotation curve (dark matter halo orbital dynamics).
+  - Exponential golden galactic core, logarithmic spiral arms with density wave theory, and outer stellar halo.
+  - Sub-pixel bilinear splatting with atomic floating-point HDR accumulation and diffraction spikes on bright giants.
+  - Luminance-preserving HDR tonemapping with cosmic void background.
+  - 3D orbiting camera with dynamic disk elevation tilt.
+- **Run in Terminal**:
+  ```bash
+  ./galaxy3d.lua
+  # 4 spiral arms with 150,000 stars:
+  ./galaxy3d.lua --arms 4 --stars 150000
+  ```
+- **Export High-Res Wallpaper**:
+  ```bash
+  ./galaxy3d.lua --size 1920x1080 --save galaxy.ppm
+  ```
+
+<p align="center">
+  <img src="galaxy.jpg" alt="3D Spiral Galaxy" width="600"/>
+</p>
+
+---
+
+### 5. `mandelbrot_demo.lua`: GPU Fractal Explorer
 A real-time fractal generator featuring continuous smooth coloring (renormalized potential function) to eliminate color banding:
 - **Modes**:
   - `mandel`: Mandelbrot set deep zoom.
