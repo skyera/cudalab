@@ -34,6 +34,10 @@ A complete 3D Signed Distance Field (SDF) raymarcher running on the GPU and stre
   ./raymarch_demo.lua --size 1920x1080 --save render.ppm
   ```
 
+<p align="center">
+  <img src="snapshot.jpg" alt="3D Raymarch Render" width="600"/>
+</p>
+
 ---
 
 ### 2. `mandelbulb3d.lua`: 3D Mandelbulb Fractal Raymarcher
@@ -54,6 +58,10 @@ Renders the famous White & Nylander **3D Mandelbulb fractal** ($v^N + c$) entire
   ./mandelbulb3d.lua --size 1920x1080 --save mandelbulb.ppm
   ```
 
+<p align="center">
+  <img src="mandelbulb.jpg" alt="3D Mandelbulb Render" width="600"/>
+</p>
+
 ---
 
 ### 3. `synthwave3d.lua`: 80s Cyberpunk / Outrun Infinite Landscape
@@ -73,6 +81,10 @@ An iconic 80s Retrowave / Synthwave endless flight simulation:
   ```bash
   ./synthwave3d.lua --size 1920x1080 --save synthwave.ppm
   ```
+
+<p align="center">
+  <img src="synthwave.jpg" alt="80s Synthwave Landscape" width="600"/>
+</p>
 
 ---
 
