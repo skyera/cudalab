@@ -85,28 +85,47 @@ local function try_load(names)
     return nil
 end
 
-local libcuda = try_load({
+local cuda_home = os.getenv("CUDA_HOME") or os.getenv("CUDA_PATH") or "/usr/local/cuda"
+
+local cuda_lib_candidates = {
     "cuda",
     "libcuda.so.1",
+    "libcuda.so",
+    cuda_home .. "/lib64/libcuda.so",
+    cuda_home .. "/lib64/libcuda.so.1",
+    "/usr/lib/x86_64-linux-gnu/libcuda.so.1",
+    "/usr/lib/x86_64-linux-gnu/libcuda.so",
+    "/usr/lib64/libcuda.so.1",
+    "/usr/lib64/libcuda.so",
     "/usr/lib/aarch64-linux-gnu/tegra/libcuda.so.1",
     "/usr/lib/aarch64-linux-gnu/libcuda.so",
-    "/usr/lib/x86_64-linux-gnu/libcuda.so",
-})
+}
+
+local libcuda = try_load(cuda_lib_candidates)
 if not libcuda then
-    error("Failed to load CUDA driver library (libcuda.so)!")
+    error("Failed to load CUDA driver library (libcuda.so)! Ensure NVIDIA GPU drivers are installed.")
 end
 
-local libnvrtc = try_load({
+local nvrtc_lib_candidates = {
     "nvrtc",
-    "libnvrtc.so.10.2",
-    "libnvrtc.so.11.0",
+    "libnvrtc.so",
     "libnvrtc.so.12",
-    "/usr/local/cuda-10.2/targets/aarch64-linux/lib/libnvrtc.so",
+    "libnvrtc.so.11.2",
+    "libnvrtc.so.11.0",
+    "libnvrtc.so.10.2",
+    cuda_home .. "/lib64/libnvrtc.so",
+    cuda_home .. "/lib/libnvrtc.so",
     "/usr/local/cuda/lib64/libnvrtc.so",
-    "/usr/local/cuda/lib/libnvrtc.so",
-})
+    "/usr/local/cuda-12/lib64/libnvrtc.so",
+    "/usr/local/cuda-11/lib64/libnvrtc.so",
+    "/usr/local/cuda-10.2/targets/aarch64-linux/lib/libnvrtc.so",
+    "/usr/lib/x86_64-linux-gnu/libnvrtc.so",
+    "/usr/lib64/libnvrtc.so",
+}
+
+local libnvrtc = try_load(nvrtc_lib_candidates)
 if not libnvrtc then
-    error("Failed to load NVRTC library (libnvrtc.so)!")
+    error("Failed to load NVRTC library (libnvrtc.so)! Ensure CUDA Toolkit / NVRTC is installed.")
 end
 
 -- -----------------------------------------------------------------------------
@@ -449,10 +468,12 @@ end
 
 local function find_cuda_includes()
     local candidates = {
+        cuda_home .. "/include",
         "/usr/local/cuda/include",
-        "/usr/local/cuda-10.2/include",
-        "/usr/local/cuda-11.0/include",
+        "/usr/include/cuda",
         "/usr/local/cuda-12/include",
+        "/usr/local/cuda-11/include",
+        "/usr/local/cuda-10.2/include",
     }
     for _, dir in ipairs(candidates) do
         local f = io.open(dir .. "/cuda.h", "r")
