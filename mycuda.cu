@@ -1107,3 +1107,39 @@ TEST_CASE("simple_assert") {
     }
 }
 
+void add(int n, float *x, float *y)
+{
+    for (int i = 0; i < n; i++)
+        y[i] = x[i] + y[i];
+}
+
+void test_add()
+{
+    int N_data =  1 << 20; // 1M elements
+    float *x = new float[N_data];
+    float *y = new float[N_data];
+
+    for (int i = 0; i < N_data; i++) {
+        x[i] = 1.0f;
+        y[i] = 2.0f;
+    }
+    add(N_data, x, y);
+
+    float max_error = 0.0f;
+    for (int i = 0; i < N_data; i++)
+        max_error = fmax(max_error, fabs(y[i] - 3.0f));
+    std::cout << "Max error: " << max_error << std::endl;
+
+    delete [] x;
+    delete [] y;
+}
+
+__global__ void add1(int n, float *sum, float *x, float *y)
+{
+    for (int i = 0; i < n; i++ )
+        sum[i] = x[i] + y[i];
+}
+
+TEST_CASE("test_add") {
+    test_add();
+}

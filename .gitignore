@@ -7,3 +7,5 @@
 *.o
 mycuda
 cuda_test
+image_blur
+*.ppm
