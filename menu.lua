@@ -106,14 +106,15 @@ local function get_term_size()
 end
 
 local function raw_mode_on()
-    os.execute("stty raw -echo 2>/dev/null")
+    -- Set non-canonical mode, no echo, while strictly maintaining output post-processing (opost, onlcr)
+    os.execute("stty -icanon -echo opost onlcr min 1 time 0 2>/dev/null")
     io.write("\27[?25l") -- Hide cursor
     io.flush()
 end
 
 local function raw_mode_off()
     os.execute("stty sane 2>/dev/null")
-    io.write("\27[?25h\27[0m") -- Show cursor and reset styling
+    io.write("\27[?25h\27[0m\r\n") -- Show cursor and reset styling
     io.flush()
 end
 
@@ -122,6 +123,22 @@ local function read_key()
     local n = ffi.C.read(0, read_buf, 16)
     if n <= 0 then return "eof" end
 
+    -- Check if it's ESC starting an escape sequence
+    if n == 1 and read_buf[0] == 27 then
+        local bytes_avail = ffi.new("int[1]")
+        ffi.C.ioctl(0, 0x541B, bytes_avail) -- FIONREAD
+        if bytes_avail[0] == 0 then
+            ffi.C.usleep(20000)
+            ffi.C.ioctl(0, 0x541B, bytes_avail)
+        end
+        if bytes_avail[0] > 0 then
+            local n2 = ffi.C.read(0, read_buf + 1, math.min(bytes_avail[0], 15))
+            if n2 > 0 then n = n + n2 end
+        else
+            return "quit" -- Lone Escape key pressed
+        end
+    end
+
     if n == 1 then
         local b = read_buf[0]
         if b == 13 or b == 10 then return "enter" end
@@ -129,13 +146,20 @@ local function read_key()
         if b == 107 or b == 75 then return "up" end   -- k/K
         if b == 106 or b == 74 then return "down" end -- j/J
         if b == 3   then return "quit" end            -- Ctrl+C
+        if b == 27  then return "quit" end            -- ESC
         if b >= 49 and b <= 54 then
             return "num_" .. (b - 48)
         end
-    elseif n >= 3 and read_buf[0] == 27 and read_buf[1] == 91 then
-        if read_buf[2] == 65 then return "up" end
-        if read_buf[2] == 66 then return "down" end
-        if read_buf[2] == 67 then return "enter" end -- Right arrow = launch
+    elseif n >= 3 and read_buf[0] == 27 then
+        local prefix = read_buf[1]
+        local code = read_buf[2]
+        if prefix == 91 or prefix == 79 then -- '[' or 'O'
+            if code == 65 then return "up" end        -- Up arrow
+            if code == 66 then return "down" end      -- Down arrow
+            if code == 67 then return "enter" end     -- Right arrow
+            if code == 53 then return "up" end        -- PgUp
+            if code == 54 then return "down" end      -- PgDn
+        end
     end
     return nil
 end
@@ -162,14 +186,13 @@ local selected = 1
 
 local function draw_menu()
     local cols, rows = get_term_size()
-    local max_w = math.max(60, math.min(cols, 100))
+    local max_w = math.max(50, math.min(cols - 1, 80))
 
     local function hr(char, color)
-        return (color or "\27[1;36m") .. string.rep(char or "─", max_w - 1) .. "\27[0m"
+        return (color or "\27[1;36m") .. string.rep(char or "─", max_w) .. "\27[0m"
     end
 
     local lines = {}
-    lines[#lines + 1] = "\27[H\27[2J" -- Clear screen and home cursor
 
     -- Header Banner
     lines[#lines + 1] = hr("=")
@@ -206,43 +229,57 @@ local function draw_menu()
     local cur = demos[selected]
     lines[#lines + 1] = string.format("  \27[1;33mScript   :\27[0m ./%s", cur.file)
 
-    -- Wrap description to fit terminal width
-    local desc_wrap_w = max_w - 14
-    local words = {}
-    for w in cur.desc:gmatch("%S+") do table.insert(words, w) end
+    -- Word-wrap helper function
+    local function add_wrapped(label, text, label_color)
+        local wrap_w = max_w - 14
+        local words = {}
+        for w in text:gmatch("%S+") do table.insert(words, w) end
 
-    local line_acc = ""
-    local is_first = true
-    for _, w in ipairs(words) do
-        if #line_acc + #w + 1 <= desc_wrap_w then
-            line_acc = (line_acc == "") and w or (line_acc .. " " .. w)
-        else
+        local line_acc = ""
+        local is_first = true
+        for _, w in ipairs(words) do
+            if #line_acc + #w + 1 <= wrap_w then
+                line_acc = (line_acc == "") and w or (line_acc .. " " .. w)
+            else
+                if is_first then
+                    lines[#lines + 1] = string.format("  %s%-9s:\27[0m %s", label_color or "\27[1;37m", label, line_acc)
+                    is_first = false
+                else
+                    lines[#lines + 1] = "             " .. line_acc
+                end
+                line_acc = w
+            end
+        end
+        if line_acc ~= "" then
             if is_first then
-                lines[#lines + 1] = "  \27[1;37mOverview :\27[0m " .. line_acc
-                is_first = false
+                lines[#lines + 1] = string.format("  %s%-9s:\27[0m %s", label_color or "\27[1;37m", label, line_acc)
             else
                 lines[#lines + 1] = "             " .. line_acc
             end
-            line_acc = w
-        end
-    end
-    if line_acc ~= "" then
-        if is_first then
-            lines[#lines + 1] = "  \27[1;37mOverview :\27[0m " .. line_acc
-        else
-            lines[#lines + 1] = "             " .. line_acc
         end
     end
 
-    lines[#lines + 1] = "  \27[2;36mTech     :\27[0m " .. cur.techniques
+    add_wrapped("Overview", cur.desc, "\27[1;37m")
+    add_wrapped("Tech", cur.techniques, "\27[2;36m")
+
     lines[#lines + 1] = string.format("  \27[2;37mCommand  :\27[0m \27[0;37m%s\27[0m", cur.suggested)
     lines[#lines + 1] = hr("─")
 
     -- Navigation Footer
-    lines[#lines + 1] = "  \27[1;37;44m [↑/↓ or j/k] Navigate   [Enter] Run Demo   [1-6] Quick Select   [q] Quit \27[0m"
+    if max_w < 76 then
+        lines[#lines + 1] = "  \27[1;37;44m [↑/↓] Navigate   [Enter] Run   [1-6] Select   [q] Quit \27[0m"
+    else
+        lines[#lines + 1] = "  \27[1;37;44m [↑/↓ or j/k] Navigate   [Enter] Run Demo   [1-6] Quick Select   [q] Quit \27[0m"
+    end
     lines[#lines + 1] = hr("=")
 
-    io.write(table.concat(lines, "\n") .. "\n")
+    -- Render with explicit Carriage Return and Line Clear on every line (\r\27[2K ... \r\n)
+    -- This 100% eliminates the terminal staircase effect under all terminal configurations
+    local out = "\27[H\27[2J"
+    for _, line in ipairs(lines) do
+        out = out .. "\r\27[2K" .. line .. "\r\n"
+    end
+    io.write(out)
     io.flush()
 end
 
@@ -252,7 +289,8 @@ end
 local function launch_demo(demo)
     raw_mode_off()
 
-    io.write("\27[2J\27[H")
+    io.write("\27[2J\27[H\r")
+    io.flush()
     print(string.format("\27[1;32m=== Launching %s (%s) ===\27[0m", demo.title, demo.file))
     print("\27[2;37mPress Ctrl+C at any time during execution to return to the menu.\27[0m\n")
 
@@ -260,7 +298,8 @@ local function launch_demo(demo)
     local cmd = string.format("./%s", demo.file)
     os.execute(cmd)
 
-    print("\n\27[1;33m[Program finished. Press Enter to return to menu...]\27[0m")
+    io.write("\r\n\27[1;33m[Program finished. Press Enter to return to menu...]\27[0m\r\n")
+    io.flush()
     io.read()
 
     raw_mode_on()
