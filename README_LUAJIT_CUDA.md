@@ -15,6 +15,18 @@ This project implements a pure **LuaJIT + CUDA** framework that allows you to wr
 
 ## 🚀 Programs Included
 
+### 🎮 `menu.lua`: Interactive TUI Demo Launcher
+Launch and explore all CUDA GPU demos from an interactive terminal dashboard:
+```bash
+./menu.lua
+```
+- **Navigation**: Use <kbd>↑</kbd> / <kbd>↓</kbd> or <kbd>j</kbd> / <kbd>k</kbd>
+- **Launch**: Press <kbd>Enter</kbd> or direct select with number keys <kbd>1</kbd>–<kbd>6</kbd>
+- **Exit to Menu**: Press <kbd>Ctrl</kbd>+<kbd>C</kbd> in any running demo to return cleanly back to the menu!
+- **Quit**: Press <kbd>q</kbd>
+
+---
+
 ### 1. `raymarch_demo.lua`: Real-Time 3D Raymarching Engine
 A complete 3D Signed Distance Field (SDF) raymarcher running on the GPU and streaming **24-bit RGB TrueColor** directly to your terminal using Unicode half-blocks (`▀`):
 - **Features**:
