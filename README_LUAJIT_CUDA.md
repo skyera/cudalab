@@ -36,7 +36,47 @@ A complete 3D Signed Distance Field (SDF) raymarcher running on the GPU and stre
 
 ---
 
-### 2. `mandelbrot_demo.lua`: GPU Fractal Explorer
+### 2. `mandelbulb3d.lua`: 3D Mandelbulb Fractal Raymarcher
+Renders the famous White & Nylander **3D Mandelbulb fractal** ($v^N + c$) entirely on the GPU:
+- **Features**:
+  - Full spherical coordinate distance estimator with trigonometric power expansion.
+  - Orbit-trap iridescent coloring (electric gold, cyan, magenta, and deep violet).
+  - Dynamic power morphing from $N=4$ to $N=8$, or fixed power via `--power 8.0`.
+  - Rim lighting, ambient occlusion, and 3D camera orbiting.
+- **Run in Terminal**:
+  ```bash
+  ./mandelbulb3d.lua
+  # Or with fixed power 8.0:
+  ./mandelbulb3d.lua --power 8.0
+  ```
+- **Export High-Res Render (e.g. 1920x1080)**:
+  ```bash
+  ./mandelbulb3d.lua --size 1920x1080 --save mandelbulb.ppm
+  ```
+
+---
+
+### 3. `synthwave3d.lua`: 80s Cyberpunk / Outrun Infinite Landscape
+An iconic 80s Retrowave / Synthwave endless flight simulation:
+- **Features**:
+  - Infinite glowing wireframe highway speeding forward with dashed lane lines.
+  - Multi-octave procedural mountain ranges on both sides.
+  - Giant glowing sunset on the horizon with horizontal blinds.
+  - Twinkling stars in the night sky and atmospheric neon pink haze.
+- **Run in Terminal**:
+  ```bash
+  ./synthwave3d.lua
+  # Speed up flight:
+  ./synthwave3d.lua --speed 1.5
+  ```
+- **Export Desktop Wallpaper**:
+  ```bash
+  ./synthwave3d.lua --size 1920x1080 --save synthwave.ppm
+  ```
+
+---
+
+### 4. `mandelbrot_demo.lua`: GPU Fractal Explorer
 A real-time fractal generator featuring continuous smooth coloring (renormalized potential function) to eliminate color banding:
 - **Modes**:
   - `mandel`: Mandelbrot set deep zoom.
@@ -53,7 +93,7 @@ A real-time fractal generator featuring continuous smooth coloring (renormalized
 
 ---
 
-### 3. `bench.lua`: LuaJIT CPU vs CUDA GPU Benchmark
+### 5. `bench.lua`: LuaJIT CPU vs CUDA GPU Benchmark
 Compares LuaJIT's JIT compiler against CUDA on the NVIDIA Tegra X1 GPU:
 - **Benchmark 1**: Vector SAXPY on 10,000,000 floats (76.3 MB)
   - LuaJIT CPU: ~42 ms
