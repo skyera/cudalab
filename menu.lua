@@ -3,12 +3,13 @@
 ================================================================================
   menu.lua: Interactive TUI Launcher for LuaJIT + CUDA Demos
 ================================================================================
-  A terminal user interface that showcases and launches all CUDA GPU demos:
-  - Up/Down or j/k to navigate
+  A clean, responsive terminal dashboard to browse and launch all CUDA demos:
+  - Arrow keys (↑ / ↓) or (j / k) to navigate
   - Enter or number keys (1-6) to launch selected demo
-  - Detailed description, GPU techniques, and recommended flags for each script
-  - Seamlessly returns to menu after each demo exits
-  - 'q' or Ctrl+C to quit
+  - Automatically adapts to any terminal width
+  - Detailed description, GPU techniques, and recommended flags
+  - Returns cleanly back to menu when any demo exits (Ctrl+C)
+  - 'q' to quit
 ================================================================================
 --]]
 
@@ -36,66 +37,60 @@ local demos = {
         file = "raymarch_demo.lua",
         title = "3D Raymarching Engine",
         tag = "Real-Time 3D",
-        badge_color = "\27[1;37;44m", -- Blue badge
+        tag_color = "\27[1;34m", -- Bright Blue
         desc = "Renders an animated 3D Signed Distance Field (SDF) scene with concentric rotating gold/copper toruses, a pulsing neon cyan plasma core, a checkered reflective ground plane, soft shadows, and ambient occlusion.",
         techniques = "Sphere Tracing SDF • Blinn-Phong Shading • Soft Shadows • Ambient Occlusion",
-        hotkeys = "Ctrl+C to return",
-        suggested = "--fps 60",
+        suggested = "./raymarch_demo.lua --fps 60",
     },
     {
         id = 2,
         file = "mandelbulb3d.lua",
         title = "3D Mandelbulb Fractal",
         tag = "Fractal DE",
-        badge_color = "\27[1;37;45m", -- Magenta badge
+        tag_color = "\27[1;35m", -- Bright Magenta
         desc = "The legendary White & Nylander 3D Mandelbulb fractal (v^N + c). Features orbit-trap iridescent crystal coloring (gold, cyan, amethyst), dynamic power morphing from N=4 to 8, rim lighting, and specular highlights.",
-        techniques = "3D Spherical Coordinate DE • Orbit Traps • Rim Lighting • AO",
-        hotkeys = "Ctrl+C to return",
-        suggested = "--power 8.0",
+        techniques = "3D Spherical Coordinate DE • Orbit Traps • Rim Lighting • Ambient Occlusion",
+        suggested = "./mandelbulb3d.lua --power 8.0",
     },
     {
         id = 3,
         file = "synthwave3d.lua",
-        title = "80s Cyberpunk / Outrun Landscape",
+        title = "80s Synthwave / Outrun Landscape",
         tag = "Retro 3D",
-        badge_color = "\27[1;37;41m", -- Red/Pink badge
+        tag_color = "\27[1;31m", -- Bright Red/Pink
         desc = "Infinite high-speed flight across an 80s Retrowave wireframe highway with rolling procedural mountain ranges on both sides, a giant glowing sunset with horizontal blinds, and a starry night sky.",
         techniques = "Procedural Ridge Heightfield • Horizon Sun Blind Shader • Starfield (<1 ms GPU)",
-        hotkeys = "Ctrl+C to return",
-        suggested = "--speed 1.5",
+        suggested = "./synthwave3d.lua --speed 1.5",
     },
     {
         id = 4,
         file = "galaxy3d.lua",
         title = "100,000+ Star 3D Spiral Galaxy",
         tag = "Astrophysics",
-        badge_color = "\27[1;37;46m", -- Cyan badge
+        tag_color = "\27[1;36m", -- Bright Cyan
         desc = "Simulates a realistic 3D spiral galaxy with 120,000+ stars using the Vera Rubin dark matter flat rotation curve, an exponential golden core, logarithmic spiral arms with starburst nebulae, and HDR tonemapping.",
         techniques = "N-Body Flat Rotation Curve • Bilinear Atomic Splatting • Filmic HDR Tonemapping",
-        hotkeys = "Ctrl+C to return",
-        suggested = "--arms 4 --stars 150000",
+        suggested = "./galaxy3d.lua --arms 4 --stars 150000",
     },
     {
         id = 5,
         file = "mandelbrot_demo.lua",
         title = "GPU Smooth Fractal Explorer",
         tag = "2D Fractals",
-        badge_color = "\27[1;37;42m", -- Green badge
+        tag_color = "\27[1;32m", -- Bright Green
         desc = "Continuous-potential Mandelbrot deep zoomer and morphing Julia sets (c(t) = 0.7885 e^it). Uses a renormalized iteration algorithm to completely eliminate color banding.",
         techniques = "Continuous Potential Distance • Smooth Palette Mapping • Deep Zoom",
-        hotkeys = "Ctrl+C to return",
-        suggested = "--zoom  OR  --mode julia",
+        suggested = "./mandelbrot_demo.lua --zoom",
     },
     {
         id = 6,
         file = "bench.lua",
         title = "LuaJIT CPU vs CUDA GPU Benchmark",
         tag = "Benchmark",
-        badge_color = "\27[1;37;43m", -- Yellow badge
+        tag_color = "\27[1;33m", -- Bright Yellow
         desc = "Direct hardware performance benchmark measuring execution speedups between LuaJIT JIT CPU code and CUDA GPU acceleration for 10M-element vector math and 2048x2048 2D image stencil convolution.",
         techniques = "SAXPY (10M floats) • 2D Stencil Blur • Hardware Event Profiling",
-        hotkeys = "Runs benchmark to completion",
-        suggested = "(runs both benchmarks)",
+        suggested = "./bench.lua",
     },
 }
 
@@ -130,10 +125,10 @@ local function read_key()
     if n == 1 then
         local b = read_buf[0]
         if b == 13 or b == 10 then return "enter" end
-        if b == 113 or b == 81 then return "quit" end
-        if b == 107 or b == 75 then return "up" end
-        if b == 106 or b == 74 then return "down" end
-        if b == 3   then return "quit" end -- Ctrl+C
+        if b == 113 or b == 81 then return "quit" end -- q/Q
+        if b == 107 or b == 75 then return "up" end   -- k/K
+        if b == 106 or b == 74 then return "down" end -- j/J
+        if b == 3   then return "quit" end            -- Ctrl+C
         if b >= 49 and b <= 54 then
             return "num_" .. (b - 48)
         end
@@ -161,105 +156,91 @@ if not ok or not dev_info then
 end
 
 -- -----------------------------------------------------------------------------
--- TUI Drawing
+-- Responsive Drawing Functions
 -- -----------------------------------------------------------------------------
 local selected = 1
 
-local function visual_len(s)
-    local clean = s:gsub("\27%[[%d;]*%a", "")
-    local wide_count = 0
-    clean = clean:gsub("🚀", function() wide_count = wide_count + 1; return "" end)
-    clean = clean:gsub("[\194-\244][\128-\191]*", "X")
-    return #clean + wide_count
-end
-
-local function box_line(pad, content, target_w)
-    local vlen = visual_len(content)
-    local fill = string.rep(" ", math.max(0, target_w - vlen))
-    return pad .. "\27[1;36m│\27[0m" .. content .. fill .. "\27[1;36m│\27[0m"
-end
-
 local function draw_menu()
     local cols, rows = get_term_size()
-    local box_w = math.min(cols - 2, 78)
-    local inner_w = box_w - 2
-    local pad = string.rep(" ", math.max(0, math.floor((cols - box_w) / 2)))
+    local max_w = math.max(60, math.min(cols, 100))
+
+    local function hr(char, color)
+        return (color or "\27[1;36m") .. string.rep(char or "─", max_w - 1) .. "\27[0m"
+    end
 
     local lines = {}
-    lines[#lines + 1] = "\27[H\27[2J" -- Home & clear screen
+    lines[#lines + 1] = "\27[H\27[2J" -- Clear screen and home cursor
 
-    -- Title Banner
-    lines[#lines + 1] = pad .. "\27[1;36m┌" .. string.rep("─", inner_w) .. "┐\27[0m"
-    lines[#lines + 1] = box_line(pad, "  \27[1;37m🚀  CUDA LAB — High-Performance GPU Graphics in LuaJIT\27[0m", inner_w)
-
-    local sub = string.format("  \27[2;37mGPU: %s (%s)  •  VRAM: %.0f MB\27[0m",
+    -- Header Banner
+    lines[#lines + 1] = hr("=")
+    lines[#lines + 1] = "  \27[1;37mCUDA LAB\27[0m  \27[2;37m•  High-Performance GPU Graphics in LuaJIT\27[0m"
+    lines[#lines + 1] = string.format("  \27[2;36m%s (%s)  •  %.0f MB VRAM\27[0m",
         dev_info.name, dev_info.arch, dev_info.total_memory_mb)
-    lines[#lines + 1] = box_line(pad, sub, inner_w)
-    lines[#lines + 1] = pad .. "\27[1;36m├" .. string.rep("─", inner_w) .. "┤\27[0m"
+    lines[#lines + 1] = hr("=")
+    lines[#lines + 1] = ""
 
     -- Menu Items
     for i, item in ipairs(demos) do
         local is_sel = (i == selected)
-        local pointer = is_sel and "\27[1;33m ▶ \27[0m" or "    "
-        local num_badge = string.format("[%d]", item.id)
-        local item_title = item.title
-        local tag_str = " " .. item.tag .. " "
+        local pointer = is_sel and "\27[1;33m▶\27[0m " or "  "
+        local num = string.format("[%d]", item.id)
+        local tag = "[" .. item.tag .. "]"
 
-        local line_content
         if is_sel then
-            line_content = string.format(
-                "%s\27[1;37;42m %s \27[0m \27[1;37m%-32s\27[0m %s%s\27[0m",
-                pointer, num_badge, item_title, item.badge_color, tag_str
+            lines[#lines + 1] = string.format(
+                "  %s\27[1;37;42m %s \27[0m \27[1;37m%-35s\27[0m  %s%s\27[0m",
+                pointer, num, item.title, item.tag_color, tag
             )
         else
-            line_content = string.format(
-                "%s\27[1;30m%s\27[0m  \27[0;37m%-32s\27[0m %s%s\27[0m",
-                pointer, num_badge, item_title, item.badge_color, tag_str
+            lines[#lines + 1] = string.format(
+                "  %s\27[2;37m %s \27[0m \27[0;37m%-35s\27[0m  %s%s\27[0m",
+                pointer, num, item.title, item.tag_color, tag
             )
         end
-        lines[#lines + 1] = box_line(pad, line_content, inner_w)
     end
 
-    lines[#lines + 1] = pad .. "\27[1;36m├" .. string.rep("─", inner_w) .. "┤\27[0m"
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = hr("─")
 
     -- Detail Card for Selected Item
     local cur = demos[selected]
-    local file_str = "  \27[1;33mScript: ./" .. cur.file .. "\27[0m"
-    lines[#lines + 1] = box_line(pad, file_str, inner_w)
+    lines[#lines + 1] = string.format("  \27[1;33mScript   :\27[0m ./%s", cur.file)
 
-    -- Word wrap description to inner_w - 4
-    local max_desc_w = inner_w - 4
+    -- Wrap description to fit terminal width
+    local desc_wrap_w = max_w - 14
     local words = {}
-    for word in cur.desc:gmatch("%S+") do table.insert(words, word) end
+    for w in cur.desc:gmatch("%S+") do table.insert(words, w) end
 
-    local cur_line = ""
-    for _, word in ipairs(words) do
-        if #cur_line + #word + 1 <= max_desc_w then
-            cur_line = (cur_line == "") and word or (cur_line .. " " .. word)
+    local line_acc = ""
+    local is_first = true
+    for _, w in ipairs(words) do
+        if #line_acc + #w + 1 <= desc_wrap_w then
+            line_acc = (line_acc == "") and w or (line_acc .. " " .. w)
         else
-            lines[#lines + 1] = box_line(pad, "  \27[0;37m" .. cur_line .. "\27[0m", inner_w)
-            cur_line = word
+            if is_first then
+                lines[#lines + 1] = "  \27[1;37mOverview :\27[0m " .. line_acc
+                is_first = false
+            else
+                lines[#lines + 1] = "             " .. line_acc
+            end
+            line_acc = w
         end
     end
-    if cur_line ~= "" then
-        lines[#lines + 1] = box_line(pad, "  \27[0;37m" .. cur_line .. "\27[0m", inner_w)
-    end
-
-    lines[#lines + 1] = box_line(pad, "", inner_w)
-    local tech_str = "  \27[2;36mTech: " .. cur.techniques .. "\27[0m"
-    if visual_len(tech_str) > inner_w - 2 then
-        while visual_len(tech_str) > inner_w - 5 do
-            tech_str = tech_str:sub(1, #tech_str - 1)
+    if line_acc ~= "" then
+        if is_first then
+            lines[#lines + 1] = "  \27[1;37mOverview :\27[0m " .. line_acc
+        else
+            lines[#lines + 1] = "             " .. line_acc
         end
-        tech_str = tech_str .. "\27[2;36m...\27[0m"
     end
-    lines[#lines + 1] = box_line(pad, tech_str, inner_w)
 
-    lines[#lines + 1] = pad .. "\27[1;36m└" .. string.rep("─", inner_w) .. "┘\27[0m"
+    lines[#lines + 1] = "  \27[2;36mTech     :\27[0m " .. cur.techniques
+    lines[#lines + 1] = string.format("  \27[2;37mCommand  :\27[0m \27[0;37m%s\27[0m", cur.suggested)
+    lines[#lines + 1] = hr("─")
 
-    -- Footer Navigation Bar
-    local nav = "\27[1;37;44m [↑/↓ or j/k] Navigate  •  [Enter] Run  •  [1-6] Quick Select  •  [q] Quit \27[0m"
-    lines[#lines + 1] = pad .. nav
+    -- Navigation Footer
+    lines[#lines + 1] = "  \27[1;37;44m [↑/↓ or j/k] Navigate   [Enter] Run Demo   [1-6] Quick Select   [q] Quit \27[0m"
+    lines[#lines + 1] = hr("=")
 
     io.write(table.concat(lines, "\n") .. "\n")
     io.flush()
@@ -275,7 +256,7 @@ local function launch_demo(demo)
     print(string.format("\27[1;32m=== Launching %s (%s) ===\27[0m", demo.title, demo.file))
     print("\27[2;37mPress Ctrl+C at any time during execution to return to the menu.\27[0m\n")
 
-    -- Run the script
+    -- Run script directly
     local cmd = string.format("./%s", demo.file)
     os.execute(cmd)
 
