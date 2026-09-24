@@ -183,10 +183,12 @@ local term_cols, term_rows = get_term_size()
 local hud_lines = 2
 local term_render_rows = math.max(10, term_rows - hud_lines)
 
-local width = opt_width or term_cols
+-- Width is strictly capped at term_cols - 2 to prevent terminal auto-wrap line gaps
+local width = opt_width or math.max(40, term_cols - 2)
 local height = opt_height or (term_render_rows * 2)
 
--- Ensure even height for half-block pair rendering
+-- Ensure even width and height for half-block rendering
+if width % 2 ~= 0 then width = width - 1 end
 if height % 2 ~= 0 then height = height + 1 end
 
 -- -----------------------------------------------------------------------------
@@ -295,6 +297,21 @@ extern "C" __global__ void k_add_sources(
             dye_r[idx] = fmaxf(dye_r[idx], 0.10f * f);
             dye_g[idx] = fmaxf(dye_g[idx], 0.85f * f);
             dye_b[idx] = fmaxf(dye_b[idx], 1.00f * f);
+        }
+
+        // Central Flame Base Bridge: connects both jets and eliminates the cold black vertical stagnation line
+        float x_center = (float)w * 0.5f;
+        if (x >= (int)x1 && x <= (int)x2 && fabsf((float)y - y1) < 4.0f) {
+            float spread = (x2 - x1) * 0.5f + 1e-3f;
+            float rel = ((float)x - x_center) / spread; // [-1, 1]
+            float bridge_f = expf(-rel * rel * 1.2f) * expf(-fabsf((float)y - y1) * 0.7f);
+            vy[idx] -= (22.0f + 10.0f * bridge_f) * bridge_f;
+            vx[idx] += sinf(time * 3.5f + (float)y * 0.25f) * 6.0f * bridge_f;
+            dens[idx] = fmaxf(dens[idx], 0.95f * bridge_f);
+            temp[idx] = fmaxf(temp[idx], 1.15f * bridge_f);
+            dye_r[idx] = fmaxf(dye_r[idx], (0.55f - 0.45f * rel) * bridge_f);
+            dye_g[idx] = fmaxf(dye_g[idx], 0.50f * bridge_f);
+            dye_b[idx] = fmaxf(dye_b[idx], (0.55f + 0.45f * rel) * bridge_f);
         }
     } else if (preset == 2) {
         // Preset 2: Infernal Roaring Bonfire
@@ -788,8 +805,8 @@ local function build_ansi_frame(data, w, h)
         local top_y = y * 2
         local bot_y = top_y + 1
         local line = {}
-        local prev_tr, prev_tg, prev_tb = -1, -1, -1
-        local prev_br, prev_bg, prev_bb = -1, -1, -1
+        local cur_fg = -1
+        local cur_bg = -1
 
         for x = 0, w - 1 do
             local top_idx = (top_y * w + x) * 3
@@ -803,12 +820,54 @@ local function build_ansi_frame(data, w, h)
             local bg = data[bot_idx + 1]
             local bb = data[bot_idx + 2]
 
-            if tr ~= prev_tr or tg ~= prev_tg or tb ~= prev_tb or
-               br ~= prev_br or bg ~= prev_bg or bb ~= prev_bb then
-                line[#line + 1] = string.format("\27[38;2;%d;%d;%dm\27[48;2;%d;%d;%dm▀", tr, tg, tb, br, bg, bb)
-                prev_tr, prev_tg, prev_tb = tr, tg, tb
-                prev_br, prev_bg, prev_bb = br, bg, bb
+            local top_black = (tr <= 1 and tg <= 1 and tb <= 1)
+            local bot_black = (br <= 1 and bg <= 1 and bb <= 1)
+
+            if tr == br and tg == bg and tb == bb then
+                -- Identical top and bottom (including ambient black cells):
+                -- Background-colored space provides 100% seamless fill with zero font-glyph seams
+                local b_code = br * 65536 + bg * 256 + bb
+                if cur_bg ~= b_code then
+                    line[#line + 1] = string.format("\27[48;2;%d;%d;%dm", br, bg, bb)
+                    cur_bg = b_code
+                end
+                line[#line + 1] = " "
+            elseif top_black and not bot_black then
+                -- Top is black, bottom is colored: lower half block (prevents bright background bleeding into top)
+                if cur_bg ~= 0 then
+                    line[#line + 1] = "\27[48;2;0;0;0m"
+                    cur_bg = 0
+                end
+                local b_code = br * 65536 + bg * 256 + bb
+                if cur_fg ~= b_code then
+                    line[#line + 1] = string.format("\27[38;2;%d;%d;%dm", br, bg, bb)
+                    cur_fg = b_code
+                end
+                line[#line + 1] = "▄"
+            elseif not top_black and bot_black then
+                -- Top is colored, bottom is black: upper half block (prevents bright background bleeding into bottom)
+                if cur_bg ~= 0 then
+                    line[#line + 1] = "\27[48;2;0;0;0m"
+                    cur_bg = 0
+                end
+                local t_code = tr * 65536 + tg * 256 + tb
+                if cur_fg ~= t_code then
+                    line[#line + 1] = string.format("\27[38;2;%d;%d;%dm", tr, tg, tb)
+                    cur_fg = t_code
+                end
+                line[#line + 1] = "▀"
             else
+                -- Both colored and different
+                local t_code = tr * 65536 + tg * 256 + tb
+                local b_code = br * 65536 + bg * 256 + bb
+                if cur_fg ~= t_code then
+                    line[#line + 1] = string.format("\27[38;2;%d;%d;%dm", tr, tg, tb)
+                    cur_fg = t_code
+                end
+                if cur_bg ~= b_code then
+                    line[#line + 1] = string.format("\27[48;2;%d;%d;%dm", br, bg, bb)
+                    cur_bg = b_code
+                end
                 line[#line + 1] = "▀"
             end
         end
