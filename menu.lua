@@ -92,6 +92,16 @@ local demos = {
         techniques = "SAXPY (10M floats) • 2D Stencil Blur • Hardware Event Profiling",
         suggested = "./bench.lua",
     },
+    {
+        id = 7,
+        file = "fluid_demo.lua",
+        title = "Navier-Stokes Fluid & Fire Sim",
+        tag = "CFD Physics",
+        tag_color = "\27[1;31m", -- Bright Red/Orange
+        desc = "Real-time Eulerian grid fluid solver on CUDA cores. Features full Navier-Stokes equations, Jacobi pressure projection, Fedkiw vorticity confinement, thermal buoyancy, and blackbody fire & neon dye palettes.",
+        techniques = "Navier-Stokes • Pressure Poisson • Vorticity Confinement • Thermal Buoyancy",
+        suggested = "./fluid_demo.lua --fps 60",
+    },
 }
 
 -- -----------------------------------------------------------------------------
@@ -147,7 +157,7 @@ local function read_key()
         if b == 106 or b == 74 then return "down" end -- j/J
         if b == 3   then return "quit" end            -- Ctrl+C
         if b == 27  then return "quit" end            -- ESC
-        if b >= 49 and b <= 54 then
+        if b >= 49 and b <= 55 then
             return "num_" .. (b - 48)
         end
     elseif n >= 3 and read_buf[0] == 27 then
@@ -267,9 +277,9 @@ local function draw_menu()
 
     -- Navigation Footer
     if max_w < 76 then
-        lines[#lines + 1] = "  \27[1;37;44m [↑/↓] Navigate   [Enter] Run   [1-6] Select   [q] Quit \27[0m"
+        lines[#lines + 1] = "  \27[1;37;44m [↑/↓] Navigate   [Enter] Run   [1-7] Select   [q] Quit \27[0m"
     else
-        lines[#lines + 1] = "  \27[1;37;44m [↑/↓ or j/k] Navigate   [Enter] Run Demo   [1-6] Quick Select   [q] Quit \27[0m"
+        lines[#lines + 1] = "  \27[1;37;44m [↑/↓ or j/k] Navigate   [Enter] Run Demo   [1-7] Quick Select   [q] Quit \27[0m"
     end
     lines[#lines + 1] = hr("=")
 

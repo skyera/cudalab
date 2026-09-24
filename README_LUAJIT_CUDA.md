@@ -142,7 +142,35 @@ A real-time fractal generator featuring continuous smooth coloring (renormalized
 
 ---
 
-### 5. `bench.lua`: LuaJIT CPU vs CUDA GPU Benchmark
+### 6. `fluid_demo.lua`: Real-Time GPU Navier-Stokes Fluid & Fire Dynamics
+A full real-time Eulerian grid fluid solver running entirely on CUDA cores at 60+ FPS:
+- **Features**:
+  - Full incompressible Navier-Stokes equations with mass conservation ($\nabla \cdot \mathbf{u} = 0$).
+  - Semi-Lagrangian unconditionally stable bilinear advection.
+  - Multi-iteration GPU Jacobi pressure Poisson solver for incompressibility projection.
+  - Fedkiw vorticity confinement to preserve swirling micro-turbulences and curling flame tongues.
+  - Thermal buoyancy forces ($F_{\text{buoy}} = -\alpha \rho + \beta (T - T_0)$) simulating hot rising gases.
+  - Planck thermal blackbody radiation color mapping with volumetric soot and smoke shading.
+  - 4 emitter presets: Twin Colliding Flame Jets, Infernal Bonfire, Triple Galactic Whirlpool, and Volcanic Eruption.
+  - Live interactive keyboard steering: use <kbd>W</kbd>/<kbd>A</kbd>/<kbd>S</kbd>/<kbd>D</kbd> or arrow keys to steer the fluid emitter in real time.
+- **Run in Terminal**:
+  ```bash
+  ./fluid_demo.lua
+  # Try the triple galactic whirlpool:
+  ./fluid_demo.lua --preset 3 --mode 1
+  ```
+- **Export Desktop Snapshot**:
+  ```bash
+  ./fluid_demo.lua --preset 1 --mode 0 --save fluid.ppm
+  ```
+
+<p align="center">
+  <img src="fluid.jpg" alt="GPU Fluid & Fire Dynamics" width="600"/>
+</p>
+
+---
+
+### 7. `bench.lua`: LuaJIT CPU vs CUDA GPU Benchmark
 Compares LuaJIT's JIT compiler against CUDA on the NVIDIA Tegra X1 GPU:
 - **Benchmark 1**: Vector SAXPY on 10,000,000 floats (76.3 MB)
   - LuaJIT CPU: ~42 ms
