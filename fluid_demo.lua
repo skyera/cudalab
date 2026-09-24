@@ -269,59 +269,68 @@ extern "C" __global__ void k_add_sources(
 
     if (preset == 1) {
         // Preset 1: Twin Colliding Swirling Flame Jets (Magenta & Cyan)
-        float flutter = sinf(time * 3.8f + (float)y * 0.15f) * 3.5f;
+        float flutter = sinf(time * 3.8f + (float)y * 0.15f) * 4.0f;
+        float y_base = (float)h * 0.92f;
 
-        float x1 = (float)w * (0.33f + 0.07f * sinf(time * 2.1f));
-        float y1 = (float)h * 0.88f;
-        float d1 = ((float)x - x1) * ((float)x - x1) + ((float)y - y1) * ((float)y - y1);
-        if (d1 < 36.0f) {
-            float f = expf(-d1 * 0.12f);
-            vy[idx] -= 38.0f * f;
-            vx[idx] += ((16.0f * cosf(time * 1.6f) + 12.0f) + flutter) * f;
-            dens[idx] = fmaxf(dens[idx], 1.0f * f);
-            temp[idx] = fmaxf(temp[idx], 1.25f * f);
-            dye_r[idx] = fmaxf(dye_r[idx], 1.0f * f);
-            dye_g[idx] = fmaxf(dye_g[idx], 0.15f * f);
-            dye_b[idx] = fmaxf(dye_b[idx], 0.70f * f);
-        }
+        float x1 = (float)w * (0.33f + 0.05f * sinf(time * 1.8f));
+        float x2 = (float)w * (0.67f - 0.05f * sinf(time * 1.8f));
 
-        float x2 = (float)w * (0.67f - 0.07f * sinf(time * 2.1f));
-        float y2 = (float)h * 0.88f;
-        float d2 = ((float)x - x2) * ((float)x - x2) + ((float)y - y2) * ((float)y - y2);
-        if (d2 < 36.0f) {
-            float f = expf(-d2 * 0.12f);
-            vy[idx] -= 38.0f * f;
-            vx[idx] -= ((16.0f * cosf(time * 1.6f) + 12.0f) - flutter) * f;
-            dens[idx] = fmaxf(dens[idx], 1.0f * f);
-            temp[idx] = fmaxf(temp[idx], 1.25f * f);
-            dye_r[idx] = fmaxf(dye_r[idx], 0.10f * f);
-            dye_g[idx] = fmaxf(dye_g[idx], 0.85f * f);
-            dye_b[idx] = fmaxf(dye_b[idx], 1.00f * f);
-        }
+        // Distance from left and right nozzles
+        float d1 = ((float)x - x1) * ((float)x - x1) + ((float)y - y_base) * ((float)y - y_base);
+        float d2 = ((float)x - x2) * ((float)x - x2) + ((float)y - y_base) * ((float)y - y_base);
 
-        // Central Flame Base Bridge: connects both jets and eliminates the cold black vertical stagnation line
+        float f1 = expf(-d1 * 0.10f);
+        float f2 = expf(-d2 * 0.10f);
+
+        // Smooth continuous burner bridge connecting both nozzles (eliminates stagnation gaps)
         float x_center = (float)w * 0.5f;
-        if (x >= (int)x1 && x <= (int)x2 && fabsf((float)y - y1) < 4.0f) {
-            float spread = (x2 - x1) * 0.5f + 1e-3f;
-            float rel = ((float)x - x_center) / spread; // [-1, 1]
-            float bridge_f = expf(-rel * rel * 1.2f) * expf(-fabsf((float)y - y1) * 0.7f);
-            vy[idx] -= (22.0f + 10.0f * bridge_f) * bridge_f;
-            vx[idx] += sinf(time * 3.5f + (float)y * 0.25f) * 6.0f * bridge_f;
-            dens[idx] = fmaxf(dens[idx], 0.95f * bridge_f);
-            temp[idx] = fmaxf(temp[idx], 1.15f * bridge_f);
-            dye_r[idx] = fmaxf(dye_r[idx], (0.55f - 0.45f * rel) * bridge_f);
-            dye_g[idx] = fmaxf(dye_g[idx], 0.50f * bridge_f);
-            dye_b[idx] = fmaxf(dye_b[idx], (0.55f + 0.45f * rel) * bridge_f);
+        float half_span = (x2 - x1) * 0.5f;
+        float rel_x = ((float)x - x_center) / (half_span + 1e-3f);
+        float dy_base = (float)y - y_base;
+        float bridge_envelope = expf(-rel_x * rel_x * 1.5f) * expf(-dy_base * dy_base * 0.12f);
+        float f_bridge = (x >= x1 - 3.0f && x <= x2 + 3.0f && fabsf(dy_base) < 6.0f) ? bridge_envelope * 0.85f : 0.0f;
+
+        // Left Nozzle: Always aims inwards (+vx towards center) with powerful upward thrust
+        if (f1 > 0.01f) {
+            vy[idx] -= 42.0f * f1;
+            vx[idx] += (22.0f + 6.0f * sinf(time * 2.3f) + flutter) * f1;
+            dens[idx] = fmaxf(dens[idx], 1.0f * f1);
+            temp[idx] = fmaxf(temp[idx], 1.30f * f1);
+            dye_r[idx] = fmaxf(dye_r[idx], 1.0f * f1);
+            dye_g[idx] = fmaxf(dye_g[idx], 0.15f * f1);
+            dye_b[idx] = fmaxf(dye_b[idx], 0.70f * f1);
+        }
+
+        // Right Nozzle: Always aims inwards (-vx towards center) with powerful upward thrust
+        if (f2 > 0.01f) {
+            vy[idx] -= 42.0f * f2;
+            vx[idx] -= (22.0f + 6.0f * sinf(time * 2.3f) - flutter) * f2;
+            dens[idx] = fmaxf(dens[idx], 1.0f * f2);
+            temp[idx] = fmaxf(temp[idx], 1.30f * f2);
+            dye_r[idx] = fmaxf(dye_r[idx], 0.10f * f2);
+            dye_g[idx] = fmaxf(dye_g[idx], 0.85f * f2);
+            dye_b[idx] = fmaxf(dye_b[idx], 1.00f * f2);
+        }
+
+        // Burner Bridge: Smooth upward combustion uniting the two flames into one roaring fire
+        if (f_bridge > 0.01f) {
+            vy[idx] -= (30.0f + 8.0f * f_bridge) * f_bridge;
+            vx[idx] += sinf(time * 3.2f + (float)y * 0.2f) * 5.0f * f_bridge;
+            dens[idx] = fmaxf(dens[idx], 0.95f * f_bridge);
+            temp[idx] = fmaxf(temp[idx], 1.20f * f_bridge);
+            dye_r[idx] = fmaxf(dye_r[idx], (0.55f - 0.45f * rel_x) * f_bridge);
+            dye_g[idx] = fmaxf(dye_g[idx], 0.50f * f_bridge);
+            dye_b[idx] = fmaxf(dye_b[idx], (0.55f + 0.45f * rel_x) * f_bridge);
         }
     } else if (preset == 2) {
         // Preset 2: Infernal Roaring Bonfire
-        if (y >= (int)((float)h * 0.88f) && x >= (int)((float)w * 0.25f) && x <= (int)((float)w * 0.75f)) {
-            float rel_x = ((float)x - (float)w * 0.5f) / ((float)w * 0.25f);
+        if (y >= (int)((float)h * 0.90f) && x >= (int)((float)w * 0.22f) && x <= (int)((float)w * 0.78f)) {
+            float rel_x = ((float)x - (float)w * 0.5f) / ((float)w * 0.28f);
             float base_shape = expf(-rel_x * rel_x * 2.0f);
             float turbulent_flicker = sinf((float)x * 0.3f + time * 5.0f) * 0.25f;
             float strength = fmaxf(0.0f, base_shape + turbulent_flicker);
 
-            vy[idx] -= (18.0f + 12.0f * strength) * 0.8f;
+            vy[idx] -= (22.0f + 14.0f * strength) * 0.8f;
             vx[idx] += sinf((float)x * 0.2f + time * 2.5f) * 4.0f;
             dens[idx] = fmaxf(dens[idx], 0.90f * strength);
             temp[idx] = fmaxf(temp[idx], 1.15f * strength);
@@ -820,19 +829,17 @@ local function build_ansi_frame(data, w, h)
             local bg = data[bot_idx + 1]
             local bb = data[bot_idx + 2]
 
-            local top_black = (tr <= 1 and tg <= 1 and tb <= 1)
-            local bot_black = (br <= 1 and bg <= 1 and bb <= 1)
+            local top_black = (tr <= 2 and tg <= 2 and tb <= 2)
+            local bot_black = (br <= 2 and bg <= 2 and bb <= 2)
 
-            if tr == br and tg == bg and tb == bb then
-                -- Identical top and bottom (including ambient black cells):
-                -- Background-colored space provides 100% seamless fill with zero font-glyph seams
-                local b_code = br * 65536 + bg * 256 + bb
-                if cur_bg ~= b_code then
-                    line[#line + 1] = string.format("\27[48;2;%d;%d;%dm", br, bg, bb)
-                    cur_bg = b_code
+            if top_black and bot_black then
+                -- Ambient black empty space: seamless background fill with zero glyph rendering
+                if cur_bg ~= 0 then
+                    line[#line + 1] = "\27[48;2;0;0;0m"
+                    cur_bg = 0
                 end
                 line[#line + 1] = " "
-            elseif top_black and not bot_black then
+            elseif top_black then
                 -- Top is black, bottom is colored: lower half block (prevents bright background bleeding into top)
                 if cur_bg ~= 0 then
                     line[#line + 1] = "\27[48;2;0;0;0m"
@@ -844,7 +851,7 @@ local function build_ansi_frame(data, w, h)
                     cur_fg = b_code
                 end
                 line[#line + 1] = "▄"
-            elseif not top_black and bot_black then
+            elseif bot_black then
                 -- Top is colored, bottom is black: upper half block (prevents bright background bleeding into bottom)
                 if cur_bg ~= 0 then
                     line[#line + 1] = "\27[48;2;0;0;0m"
@@ -856,6 +863,14 @@ local function build_ansi_frame(data, w, h)
                     cur_fg = t_code
                 end
                 line[#line + 1] = "▀"
+            elseif tr == br and tg == bg and tb == bb then
+                -- Both colored and identical: background-colored space provides 100% seamless fill
+                local b_code = br * 65536 + bg * 256 + bb
+                if cur_bg ~= b_code then
+                    line[#line + 1] = string.format("\27[48;2;%d;%d;%dm", br, bg, bb)
+                    cur_bg = b_code
+                end
+                line[#line + 1] = " "
             else
                 -- Both colored and different
                 local t_code = tr * 65536 + tg * 256 + tb
