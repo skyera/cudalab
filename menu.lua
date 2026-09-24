@@ -102,6 +102,16 @@ local demos = {
         techniques = "Navier-Stokes • Pressure Poisson • Vorticity Confinement • Thermal Buoyancy",
         suggested = "./fluid_demo.lua --fps 60",
     },
+    {
+        id = 8,
+        file = "saturn3d.lua",
+        title = "Saturn Rings & Shepherd Moons",
+        tag = "Astrophysics",
+        tag_color = "\27[1;36m", -- Bright Cyan
+        desc = "Real-time 3D raytraced Saturn gas giant with oblate atmospheric cloud bands, the North Polar Hexagon vortex, and the ring system (Cassini division, Encke gap, B/C/D/F rings). Features dual shadows and 4 Keplerian shepherd moons.",
+        techniques = "Oblate Spheroid Raytracing • Cassini Division • Planet/Ring Shadows • Keplerian Moons",
+        suggested = "./saturn3d.lua --fps 60",
+    },
 }
 
 -- -----------------------------------------------------------------------------
@@ -157,7 +167,7 @@ local function read_key()
         if b == 106 or b == 74 then return "down" end -- j/J
         if b == 3   then return "quit" end            -- Ctrl+C
         if b == 27  then return "quit" end            -- ESC
-        if b >= 49 and b <= 55 then
+        if b >= 49 and b <= 56 then
             return "num_" .. (b - 48)
         end
     elseif n >= 3 and read_buf[0] == 27 then
@@ -277,9 +287,9 @@ local function draw_menu()
 
     -- Navigation Footer
     if max_w < 76 then
-        lines[#lines + 1] = "  \27[1;37;44m [↑/↓] Navigate   [Enter] Run   [1-7] Select   [q] Quit \27[0m"
+        lines[#lines + 1] = "  \27[1;37;44m [↑/↓] Navigate   [Enter] Run   [1-8] Select   [q] Quit \27[0m"
     else
-        lines[#lines + 1] = "  \27[1;37;44m [↑/↓ or j/k] Navigate   [Enter] Run Demo   [1-7] Quick Select   [q] Quit \27[0m"
+        lines[#lines + 1] = "  \27[1;37;44m [↑/↓ or j/k] Navigate   [Enter] Run Demo   [1-8] Quick Select   [q] Quit \27[0m"
     end
     lines[#lines + 1] = hr("=")
 

@@ -185,6 +185,35 @@ Compares LuaJIT's JIT compiler against CUDA on the NVIDIA Tegra X1 GPU:
 
 ---
 
+### 8. `saturn3d.lua`: Real-Time 3D Saturn Ring System & Shepherd Moons
+An astrophysics raytracer simulating Saturn's planetary atmosphere and ring dynamics at 150+ FPS:
+- **Features**:
+  - Oblate gas giant ellipsoid raytracing with authentic polar flattening ($R_{\text{pol}} / R_{\text{eq}} \approx 0.90$) and $26.7^\circ$ axial tilt.
+  - Multi-harmonic atmospheric cloud banding, turbulent storm eddies, and the iconic North Polar Hexagonal vortex.
+  - Optically modeled ring system containing the D, C (Crepe), B, Cassini Division, A, Encke Gap, and F rings with sinusoidal micro-ringlet textures.
+  - Dual dynamic raytraced shadows: Saturn's body casts an elliptical shadow across the night side of the rings (with golden Saturnshine bounce light), and the rings cast multi-banded shadow stripes across Saturn's clouds.
+  - 4 active Keplerian orbiting shepherd moons: Mimas (resonates with Cassini division), Enceladus (brilliant icy geyser moon), Tethys, and Prometheus.
+  - Procedural twinkling deep space starfield with Sun disk and forward-scattering coronal glare.
+  - 4 camera view presets (Cassini Oblique, Ring Plane Skim, North Polar Hexagon, Backlit Crescent) and 3 palette modes (Natural TrueColor, UV Methane Belt, Thermal Radiance).
+- **Run in Terminal**:
+  ```bash
+  ./saturn3d.lua
+  # View the North Polar Hexagon:
+  ./saturn3d.lua --view 3
+  # Backlit golden crescent view:
+  ./saturn3d.lua --view 4
+  ```
+- **Export 4K Wallpaper**:
+  ```bash
+  ./saturn3d.lua --size 3840x2160 --view 1 --save saturn_4k.ppm
+  ```
+
+<p align="center">
+  <img src="saturn.jpg" alt="3D Saturn Ring System & Shepherd Moons" width="600"/>
+</p>
+
+---
+
 ## 🛠️ The `cuda.lua` Module API
 
 `cuda.lua` provides a clean, idiomatic Lua wrapper for the CUDA Driver API and NVRTC:
