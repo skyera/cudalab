@@ -821,17 +821,17 @@ end
 -- Real-Time Interactive Simulation Loop
 -- -----------------------------------------------------------------------------
 local preset_names = {
-    [1] = "Twin Colliding Flame Jets",
-    [2] = "Infernal Roaring Bonfire",
-    [3] = "Triple Galactic Whirlpool",
-    [4] = "Volcanic Eruption / Solar Flare",
+    [1] = "Twin Jets",
+    [2] = "Bonfire",
+    [3] = "Whirlpool",
+    [4] = "Volcano",
 }
 
 local mode_names = {
-    [0] = "Infernal Fire & Volcanic Smoke",
-    [1] = "Cyberpunk Neon Dye Mixing",
-    [2] = "Toxic Bio-Plasma",
-    [3] = "Scientific Vorticity Heatmap",
+    [0] = "Fire & Smoke",
+    [1] = "Neon Dye",
+    [2] = "Bio-Plasma",
+    [3] = "Vorticity",
 }
 
 local cur_preset = opt_preset
@@ -974,15 +974,15 @@ local ok, err = pcall(function()
             last_time = now
         end
 
-        local vort_str = vorticity_enabled and "\27[1;32mON\27[0m " or "\27[1;31mOFF\27[0m"
-        local hud1 = string.format(
-            "\r\27[2K  \27[1;37mCUDA FLUID\27[0m \27[2;37m•\27[0m \27[1;32m%.1f FPS\27[0m \27[2;37m(GPU: %.2f ms)\27[0m \27[2;37m•\27[0m Palette: \27[1;36m%s\27[0m \27[2;37m•\27[0m Preset: \27[1;33m%s\27[0m \27[2;37m•\27[0m Vort: %s",
+        local vort_str = vorticity_enabled and "\27[1;32mON\27[0m" or "\27[1;31mOFF\27[0m"
+        local top_hud = string.format(
+            "  \27[1;37mCUDA FLUID\27[0m \27[2;37m•\27[0m \27[1;32m%4.1f FPS\27[0m \27[2;37m(%4.1f ms)\27[0m \27[2;37m•\27[0m \27[1;36m%s\27[0m \27[2;37m•\27[0m \27[1;33m%s\27[0m \27[2;37m•\27[0m Vort: %s",
             fps, gpu_ms, mode_names[cur_mode], preset_names[cur_preset], vort_str
         )
-        local hud2 = "\r\27[2K  \27[2;37mControls: [W/A/S/D: Steer Emitter] [m/Space: Palette] [e: Preset] [v: Vorticity] [c: Clear] [q: Quit]\27[0m"
+        local bottom_hud = "  \27[2;37m[W/A/S/D] Steer  [m] Palette  [e] Preset  [v] Vorticity  [c] Clear  [q] Quit\27[0m"
 
-        -- Blit to terminal screen without flickering
-        io.write("\27[H" .. hud1 .. "\r\n" .. hud2 .. "\r\n" .. ansi_frame)
+        -- Blit single frame buffer with top status and bottom controls to eliminate duplication
+        io.write("\27[H\r\27[2K" .. top_hud .. "\27[K\r\n" .. ansi_frame .. "\r\n\r\27[2K" .. bottom_hud .. "\27[K")
         io.flush()
 
         -- Check frame limit
