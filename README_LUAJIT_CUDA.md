@@ -240,6 +240,31 @@ A massive-scale GPU cellular automata engine running across up to **16,777,216 c
 
 ---
 
+### 9. `voxel3d.lua`: Real-Time 3D Voxel Raycasting Engine (Minecraft in Terminal)
+A 3D voxel sandbox running an **Amanatides & Woo Fast Voxel DDA** raycaster directly on CUDA cores across **1,048,576+ voxels** ($128 \times 64 \times 128$):
+- **Features**:
+  - **Procedural 3D World Generation**: Multi-octave fBm terrain with rolling hills, mountain peaks, stone bedrock, dirt/grass strata, sandy shorelines, oak trees with foliage canopies, and underground ore veins.
+  - **Exact 3D DDA Raycaster**: Zero missed rays, sub-millisecond execution time on GPU cores ($< 0.8\text{ ms}$ per frame).
+  - **Directional Sunlight & Atmosphere**: Real-time Lambertian sunlight, face-specific normals (Top, Bottom, East, West, North, South), glowing sun disk, and distance fog fading smoothly into the sky.
+  - **Live World Modification**: Real-time screen-center crosshair query; break/dig blocks with <kbd>Enter</kbd>/<kbd>B</kbd>, place blocks with <kbd>P</kbd>, and switch items across a 9-slot inventory hotbar.
+  - **10 Voxel Materials**: Grass, Dirt, Stone, Wood Log, Leaves, Water, Sand, Glowstone/Gold, Lava, and Red Brick.
+- **Run in Terminal**:
+  ```bash
+  ./voxel3d.lua
+  # Or with custom seed:
+  ./voxel3d.lua --seed 42
+  ```
+- **Export High-Res Wallpaper (1920x1080)**:
+  ```bash
+  ./voxel3d.lua --save voxel.ppm
+  ```
+
+<p align="center">
+  <img src="voxel.jpg" alt="3D Voxel Raycaster (Minecraft in Terminal)" width="600"/>
+</p>
+
+---
+
 ## 🛠️ The `cuda.lua` Module API
 
 `cuda.lua` provides a clean, idiomatic Lua wrapper for the CUDA Driver API and NVRTC:

@@ -5,7 +5,7 @@
 ================================================================================
   A clean, responsive terminal dashboard to browse and launch all CUDA demos:
   - Arrow keys (↑ / ↓) or (j / k) to navigate
-  - Enter or number keys (1-9) to launch selected demo
+  - Enter or number keys (1-9, 0) to launch selected demo
   - Automatically adapts to any terminal width
   - Detailed description, GPU techniques, and recommended flags
   - Returns cleanly back to menu when any demo exits (Ctrl+C)
@@ -122,6 +122,16 @@ local demos = {
         techniques = "Toroidal Bitwise Stencil • Sub-Pixel Unicode Braille • Multi-Scale LOD • Phosphor Trails",
         suggested = "./life_demo.lua --fps 60",
     },
+    {
+        id = 10,
+        file = "voxel3d.lua",
+        title = "3D Voxel Raycaster (Minecraft)",
+        tag = "Voxel Engine",
+        tag_color = "\27[1;33m", -- Bright Yellow
+        desc = "Real-time 3D voxel engine running an Amanatides & Woo Fast Voxel DDA raycaster on CUDA across 1M+ voxels. Features procedural fBm terrain with hills, caves, oak trees, and beaches, directional sunlight & shadows, and live block digging/placing.",
+        techniques = "3D DDA Raycaster • Procedural fBm World Gen • Directional Sunlight • Live Dig/Place",
+        suggested = "./voxel3d.lua --fps 60",
+    },
 }
 
 -- -----------------------------------------------------------------------------
@@ -177,8 +187,10 @@ local function read_key()
         if b == 106 or b == 74 then return "down" end -- j/J
         if b == 3   then return "quit" end            -- Ctrl+C
         if b == 27  then return "quit" end            -- ESC
-        if b >= 49 and b <= 56 then
+        if b >= 49 and b <= 57 then
             return "num_" .. (b - 48)
+        elseif b == 48 then
+            return "num_10"
         end
     elseif n >= 3 and read_buf[0] == 27 then
         local prefix = read_buf[1]
@@ -353,8 +365,8 @@ local function main()
             if selected > #demos then selected = 1 end
         elseif key == "enter" then
             launch_demo(demos[selected])
-        elseif key and key:match("^num_(%d)") then
-            local num = tonumber(key:match("^num_(%d)"))
+        elseif key and key:match("^num_(%d+)") then
+            local num = tonumber(key:match("^num_(%d+)"))
             if num >= 1 and num <= #demos then
                 selected = num
                 launch_demo(demos[selected])
