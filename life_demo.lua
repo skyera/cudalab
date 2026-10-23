@@ -746,8 +746,8 @@ local d_age   = cuda.alloc("uint8_t", total_cells)
 -- Terminal resolution and viewport setup
 local term_cols, term_rows = get_term_size()
 local hud_lines = 4
-local view_rows = math.max(10, term_rows - hud_lines)
-local view_cols = math.max(20, term_cols)
+local view_rows = math.max(8, term_rows - hud_lines)
+local view_cols = math.max(20, term_cols - 2)
 
 local out_cells_count = view_cols * view_rows
 local d_out_cells = cuda.alloc(out_cells_count * 4) -- 4 bytes per CellOutput (mask, r, g, b)
@@ -917,8 +917,8 @@ local ok, err = pcall(function()
 
         -- Dynamic terminal resizing
         local new_cols, new_rows = get_term_size()
-        local new_vrows = math.max(10, new_rows - hud_lines)
-        local new_vcols = math.max(20, new_cols)
+        local new_vrows = math.max(8, new_rows - hud_lines)
+        local new_vcols = math.max(20, new_cols - 2)
         if new_vcols ~= view_cols or new_vrows ~= view_rows then
             view_cols = new_vcols
             view_rows = new_vrows
@@ -1034,17 +1034,18 @@ local ok, err = pcall(function()
         -- Top HUD Bar
         local status_str = paused and "\27[1;33m[PAUSED]\27[0m" or "\27[1;32m[RUNNING]\27[0m"
         local hud_top = string.format(
-            "\r\27[H\27[2K\27[1;36m▶ CUDA Conway's Life\27[0m %s │ \27[1;37mGen:\27[0m %d │ \27[1;37mGrid:\27[0m %dx%d │ \27[1;37mZoom:\27[0m %dx │ \27[1;37mCam:\27[0m (%d,%d) │ \27[1;37mPalette:\27[0m %s",
+            "\27[H\r\27[2K\27[1;36m▶ CUDA Conway's Life\27[0m %s │ \27[1;37mGen:\27[0m %d │ \27[1;37mGrid:\27[0m %dx%d │ \27[1;37mZoom:\27[0m %dx │ \27[1;37mCam:\27[0m (%d,%d) │ \27[1;37mPalette:\27[0m %s\27[K",
             status_str, generation, grid_size, grid_size, cur_zoom, cam_x, cam_y, PALETTE_NAMES[cur_palette]
         )
 
         -- Bottom HUD Bar & Controls
-        local hud_bottom = string.format(
-            "\r\n\27[2K\27[1;35mRate:\27[0m %.0f FPS (%d steps/f) │ \27[1;35mGPU Step:\27[0m %.2f ms │ \27[1;35mPattern [P]:\27[0m %s\r\n\27[2K\27[90m[W/A/S/D] Pan │ [+/-] Zoom │ [Space] Pause │ [N] Step │ [R] Soup │ [P] Stamp │ [M] Palette │ [Q] Quit\27[0m",
+        local hud_bottom1 = string.format(
+            "\r\27[2K\27[1;35mRate:\27[0m %.0f FPS (%d steps/f) │ \27[1;35mGPU Step:\27[0m %.2f ms │ \27[1;35mPattern [P]:\27[0m %s\27[K",
             actual_fps, cur_speed, gpu_step_ms, PATTERNS[pattern_idx].name
         )
+        local hud_bottom2 = "\r\27[2K\27[90m[W/A/S/D] Pan │ [+/-] Zoom │ [Space] Pause │ [N] Step │ [R] Soup │ [P] Stamp │ [M] Palette │ [Q] Quit\27[0m\27[K"
 
-        io.write(hud_top .. "\r\n" .. frame_ansi .. hud_bottom)
+        io.write(hud_top .. "\r\n" .. frame_ansi .. "\r\n" .. hud_bottom1 .. "\r\n" .. hud_bottom2)
         io.flush()
 
         frame_count = frame_count + 1

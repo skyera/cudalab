@@ -178,8 +178,9 @@ end
 -- Determine Resolution
 -- -----------------------------------------------------------------------------
 local term_cols, term_rows = get_term_size()
+-- hud_lines: 1 top line + 2 bottom lines + 1 safety margin = 4 lines reserved
 local hud_lines = 4
-local render_rows = math.max(10, term_rows - hud_lines)
+local render_rows = math.max(8, term_rows - hud_lines)
 local width = opt_width or math.max(40, term_cols - 2)
 local height = opt_height or (render_rows * 2)
 
@@ -946,7 +947,7 @@ local ok, err = pcall(function()
             or "\27[90mNone (Sky)\27[0m"
 
         local hud_top = string.format(
-            "\r\27[H\27[2K\27[1;36m▶ CUDA 3D Voxel Engine\27[0m │ \27[1;37mPos:\27[0m (%.1f, %.1f, %.1f) │ \27[1;37mYaw:\27[0m %.0f° │ \27[1;37mTarget:\27[0m %s",
+            "\27[H\r\27[2K\27[1;36m▶ CUDA 3D Voxel Engine\27[0m │ \27[1;37mPos:\27[0m (%.1f, %.1f, %.1f) │ \27[1;37mYaw:\27[0m %.0f° │ \27[1;37mTarget:\27[0m %s\27[K",
             cam_x, cam_y, cam_z, math.deg(yaw) % 360, target_str
         )
 
@@ -964,12 +965,13 @@ local ok, err = pcall(function()
         local hotbar_str = table.concat(hotbar, " ")
 
         -- Bottom Telemetry & Controls
-        local hud_bottom = string.format(
-            "\r\n\27[2K\27[1;35mRate:\27[0m %.0f FPS │ \27[1;35mGPU DDA:\27[0m %.2f ms │ \27[1;35mSpeed:\27[0m %s │ \27[1;35mHotbar:\27[0m %s\r\n\27[2K\27[90m[W/A/S/D] Move │ [E/C] Fly │ [Arrows/J/L] Look │ [Enter/B] Dig │ [P] Place │ [1-9] Block │ [F] Sprint │ [Q] Quit\27[0m",
+        local hud_bottom1 = string.format(
+            "\r\27[2K\27[1;35mRate:\27[0m %.0f FPS │ \27[1;35mGPU DDA:\27[0m %.2f ms │ \27[1;35mSpeed:\27[0m %s │ \27[1;35mHotbar:\27[0m %s\27[K",
             actual_fps, gpu_ms, sprint and "\27[1;33mFAST\27[0m" or "\27[32mNORMAL\27[0m", hotbar_str
         )
+        local hud_bottom2 = "\r\27[2K\27[90m[W/A/S/D] Move │ [E/C] Fly │ [Arrows/J/L] Look │ [Enter/B] Dig │ [P] Place │ [1-9] Block │ [F] Sprint │ [Q] Quit\27[0m\27[K"
 
-        io.write(hud_top .. "\r\n" .. frame_ansi .. "\r\n" .. hud_bottom)
+        io.write(hud_top .. "\r\n" .. frame_ansi .. "\r\n" .. hud_bottom1 .. "\r\n" .. hud_bottom2)
         io.flush()
 
         frame_count = frame_count + 1
