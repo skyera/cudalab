@@ -5,7 +5,7 @@
 ================================================================================
   A clean, responsive terminal dashboard to browse and launch all CUDA demos:
   - Arrow keys (↑ / ↓) or (j / k) to navigate
-  - Enter or number keys (1-6) to launch selected demo
+  - Enter or number keys (1-9) to launch selected demo
   - Automatically adapts to any terminal width
   - Detailed description, GPU techniques, and recommended flags
   - Returns cleanly back to menu when any demo exits (Ctrl+C)
@@ -111,6 +111,16 @@ local demos = {
         desc = "Real-time 3D raytraced Saturn gas giant with oblate atmospheric cloud bands, the North Polar Hexagon vortex, and the ring system (Cassini division, Encke gap, B/C/D/F rings). Features dual shadows and 4 Keplerian shepherd moons.",
         techniques = "Oblate Spheroid Raytracing • Cassini Division • Planet/Ring Shadows • Keplerian Moons",
         suggested = "./saturn3d.lua --fps 60",
+    },
+    {
+        id = 9,
+        file = "life_demo.lua",
+        title = "Toroidal Game of Life (4096²)",
+        tag = "Cellular Automata",
+        tag_color = "\27[1;32m", -- Bright Green
+        desc = "Massive-scale GPU Conway's Game of Life (up to 16.7M cells) with sub-pixel Unicode Braille terminal rendering (2x4 per cell), dynamic multi-scale LOD zoom (1x to 32x), cell longevity coloring, CRT phosphor decay trails, and iconic pattern stamping.",
+        techniques = "Toroidal Bitwise Stencil • Sub-Pixel Unicode Braille • Multi-Scale LOD • Phosphor Trails",
+        suggested = "./life_demo.lua --fps 60",
     },
 }
 

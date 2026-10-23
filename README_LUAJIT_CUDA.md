@@ -214,6 +214,32 @@ An astrophysics raytracer simulating Saturn's planetary atmosphere and ring dyna
 
 ---
 
+### 8. `life_demo.lua`: GPU Toroidal Conway's Game of Life (Up to 4096²)
+A massive-scale GPU cellular automata engine running across up to **16,777,216 cells** with crisp **sub-pixel Unicode Braille** terminal rendering:
+- **Features**:
+  - **Sub-Pixel Braille Rendering**: 8 dots per terminal character (2×4 grid), packing 4× the resolution into your terminal window.
+  - **Massive Universe Sizes**: $1024 \times 1024$, $2048 \times 2048$, or $4096 \times 4096$ toroidal grid on CUDA.
+  - **Multi-Scale Dynamic LOD Zoom**: Seamlessly zoom from 1:1 cell inspection out to 32× overview.
+  - **Longevity Tracking & CRT Phosphor Trails**: Tracks cell age with neon glow for ancient stable structures and fading ghost decay trails for dead cells.
+  - **5 Cybernetic Palettes**: Matrix Phosphor Green, Cyberpunk Neon, 1980s Amber CRT, Bioluminescent Ocean, and Solar Magma.
+  - **Iconic Pattern Catalog**: Gosper Glider Gun, Simkin Gun, Acorn, R-pentomino, Diehard, Pulsar, Spaceship armada.
+- **Run in Terminal**:
+  ```bash
+  ./life_demo.lua
+  # Or start with Acorn methuselah in Amber CRT palette:
+  ./life_demo.lua --preset acorn --palette 2
+  ```
+- **Export High-Res Render (1920x1080)**:
+  ```bash
+  ./life_demo.lua --save life.ppm
+  ```
+
+<p align="center">
+  <img src="life.jpg" alt="GPU Conway's Game of Life" width="600"/>
+</p>
+
+---
+
 ## 🛠️ The `cuda.lua` Module API
 
 `cuda.lua` provides a clean, idiomatic Lua wrapper for the CUDA Driver API and NVRTC:
