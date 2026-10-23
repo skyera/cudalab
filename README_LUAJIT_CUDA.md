@@ -265,6 +265,31 @@ A 3D voxel sandbox running an **Amanatides & Woo Fast Voxel DDA** raycaster dire
 
 ---
 
+### 10. `flight3d.lua`: 3D Space Flight Simulator & Asteroid Belt Dogfight
+A real-time 6-DOF spaceship flight simulator and asteroid combat game running on CUDA cores:
+- **Features**:
+  - **Infinite Procedural Asteroid Belt**: 3D tumbling SDF asteroids with multi-octave craters, mineral ore veins, and specular celestial lighting.
+  - **Twin Plasma Laser Cannons**: High-velocity glowing laser bolts with real-time hit detection, explosive asteroid shattering, and incandescent fire debris.
+  - **6-DOF Newtonian Flight Dynamics**: Pitch, yaw, roll, forward throttle, strafe, elevate, and afterburner warp boost with relativistic star streaks.
+  - **Volumetric Cosmic Nebula**: Deep indigo space background with twinkling stars and colorful gas cloud nebulae.
+  - **Combat Flight HUD**: Forward target lock-on tracking box, rangefinder, velocity meter, and cockpit canopy frame (toggled with <kbd>V</kbd>).
+- **Run in Terminal**:
+  ```bash
+  ./flight3d.lua
+  # Or with target 60 FPS:
+  ./flight3d.lua --fps 60
+  ```
+- **Export High-Res Wallpaper (1920x1080)**:
+  ```bash
+  ./flight3d.lua --save flight.ppm
+  ```
+
+<p align="center">
+  <img src="flight.jpg" alt="3D Space Flight Simulator & Asteroid Dogfight" width="600"/>
+</p>
+
+---
+
 ## 🛠️ The `cuda.lua` Module API
 
 `cuda.lua` provides a clean, idiomatic Lua wrapper for the CUDA Driver API and NVRTC:

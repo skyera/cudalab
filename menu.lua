@@ -132,6 +132,16 @@ local demos = {
         techniques = "3D DDA Raycaster • Procedural fBm World Gen • Directional Sunlight • Live Dig/Place",
         suggested = "./voxel3d.lua --fps 60",
     },
+    {
+        id = 11,
+        file = "flight3d.lua",
+        title = "3D Space Flight Simulator & Dogfight",
+        tag = "Space Flight",
+        tag_color = "\27[1;36m", -- Bright Cyan
+        desc = "Real-time 6-DOF spaceship flight through an infinite procedural asteroid field on CUDA. Features twin glowing plasma lasers, real-time asteroid explosive shattering, cockpit canopy, target lock-on HUD, and afterburner warp speed.",
+        techniques = "Infinite SDF Asteroid Field • 6-DOF Newtonian Flight • Twin Plasma Lasers • Cockpit HUD",
+        suggested = "./flight3d.lua --fps 60",
+    },
 }
 
 -- -----------------------------------------------------------------------------
