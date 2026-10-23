@@ -124,13 +124,13 @@ end
 
 local function raw_mode_on()
     os.execute("stty -icanon -echo opost onlcr min 1 time 0 2>/dev/null")
-    io.write("\27[?1049h\27[?25l") -- Alternate screen buffer and hide cursor
+    io.write("\27[?25l") -- Hide cursor
     io.flush()
 end
 
 local function raw_mode_off()
     os.execute("stty sane 2>/dev/null")
-    io.write("\27[?1049l\27[?25h\27[0m\r\n") -- Restore screen and cursor
+    io.write("\27[?25h\27[0m\r\n") -- Restore cursor and reset styling
     io.flush()
 end
 
@@ -180,7 +180,7 @@ end
 local term_cols, term_rows = get_term_size()
 -- hud_lines: 1 top line + 2 bottom lines + 1 safety margin = 4 lines reserved
 local hud_lines = 4
-local render_rows = math.max(8, term_rows - hud_lines)
+local render_rows = math.max(6, term_rows - hud_lines)
 local width = opt_width or math.max(40, term_cols - 2)
 local height = opt_height or (render_rows * 2)
 
@@ -741,12 +741,12 @@ local function build_ansi_frame(data, w, h)
     local lines = {}
     local half_h = math.floor(h / 2)
 
-    for cy = 0, half_h - 1 do
-        local top_y = cy * 2
+    for y = 0, half_h - 1 do
+        local top_y = y * 2
         local bot_y = top_y + 1
         local line = {}
-        local prev_tr, prev_tg, prev_tb = -1, -1, -1
-        local prev_br, prev_bg, prev_bb = -1, -1, -1
+        local cur_fg = -1
+        local cur_bg = -1
 
         for x = 0, w - 1 do
             local top_idx = (top_y * w + x) * 3
@@ -760,12 +760,24 @@ local function build_ansi_frame(data, w, h)
             local bg = data[bot_idx + 1]
             local bb = data[bot_idx + 2]
 
-            if tr ~= prev_tr or tg ~= prev_tg or tb ~= prev_tb or
-               br ~= prev_br or bg ~= prev_bg or bb ~= prev_bb then
-                line[#line + 1] = string.format("\27[38;2;%d;%d;%dm\27[48;2;%d;%d;%dm▀", tr, tg, tb, br, bg, bb)
-                prev_tr, prev_tg, prev_tb = tr, tg, tb
-                prev_br, prev_bg, prev_bb = br, bg, bb
+            local t_code = tr * 65536 + tg * 256 + tb
+            local b_code = br * 65536 + bg * 256 + bb
+
+            if tr == br and tg == bg and tb == bb then
+                if cur_bg ~= b_code then
+                    line[#line + 1] = string.format("\27[48;2;%d;%d;%dm", br, bg, bb)
+                    cur_bg = b_code
+                end
+                line[#line + 1] = " "
             else
+                if cur_fg ~= t_code then
+                    line[#line + 1] = string.format("\27[38;2;%d;%d;%dm", tr, tg, tb)
+                    cur_fg = t_code
+                end
+                if cur_bg ~= b_code then
+                    line[#line + 1] = string.format("\27[48;2;%d;%d;%dm", br, bg, bb)
+                    cur_bg = b_code
+                end
                 line[#line + 1] = "▀"
             end
         end
@@ -840,7 +852,7 @@ local ok, err = pcall(function()
 
         -- Dynamic terminal resizing
         local new_cols, new_rows = get_term_size()
-        local new_rrows = math.max(10, new_rows - hud_lines)
+        local new_rrows = math.max(6, new_rows - hud_lines)
         local new_w = math.max(40, new_cols - 2)
         local new_h = new_rrows * 2
         if new_w % 2 ~= 0 then new_w = new_w - 1 end
@@ -941,37 +953,26 @@ local ok, err = pcall(function()
         d_out:to_host(h_out)
         local frame_ansi = build_ansi_frame(h_out, width, height)
 
-        -- Top HUD Line
+        -- Top HUD Line (compact: fits comfortably in 80 columns)
         local target_str = (target.hit == 1)
-            and string.format("%s%s\27[0m (d: %.1f)", BLOCK_COLORS[target.block_type] or "", BLOCK_NAMES[target.block_type] or "Block", target.dist)
-            or "\27[90mNone (Sky)\27[0m"
+            and string.format("%s%s\27[0m (d:%.0f)", BLOCK_COLORS[target.block_type] or "", BLOCK_NAMES[target.block_type] or "Block", target.dist)
+            or "\27[90mSky\27[0m"
 
-        local hud_top = string.format(
-            "\27[H\r\27[2K\27[1;36m▶ CUDA 3D Voxel Engine\27[0m │ \27[1;37mPos:\27[0m (%.1f, %.1f, %.1f) │ \27[1;37mYaw:\27[0m %.0f° │ \27[1;37mTarget:\27[0m %s\27[K",
-            cam_x, cam_y, cam_z, math.deg(yaw) % 360, target_str
+        local top_hud = string.format(
+            "  \27[1;36mVOXEL 3D\27[0m \27[2;37m•\27[0m \27[1;32m%4.1f FPS (%4.1f ms)\27[0m \27[2;37m•\27[0m Pos:(%d,%d,%d) \27[2;37m•\27[0m %s \27[2;37m•\27[0m Aim: %s",
+            actual_fps, gpu_ms, math.floor(cam_x), math.floor(cam_y), math.floor(cam_z),
+            sprint and "\27[1;33mFAST\27[0m" or "\27[32mNORM\27[0m",
+            target_str
         )
 
-        -- Hotbar Inventory Line
-        local hotbar = {}
-        for s = 1, 9 do
-            local name = BLOCK_NAMES[s] or "Block"
-            local color = BLOCK_COLORS[s] or ""
-            if s == cur_slot then
-                hotbar[#hotbar + 1] = string.format("\27[1;7m[%d:%s]\27[0m", s, name)
-            else
-                hotbar[#hotbar + 1] = string.format("%s[%d:%s]\27[0m", color, s, name)
-            end
-        end
-        local hotbar_str = table.concat(hotbar, " ")
-
-        -- Bottom Telemetry & Controls
-        local hud_bottom1 = string.format(
-            "\r\27[2K\27[1;35mRate:\27[0m %.0f FPS │ \27[1;35mGPU DDA:\27[0m %.2f ms │ \27[1;35mSpeed:\27[0m %s │ \27[1;35mHotbar:\27[0m %s\27[K",
-            actual_fps, gpu_ms, sprint and "\27[1;33mFAST\27[0m" or "\27[32mNORMAL\27[0m", hotbar_str
+        -- Bottom HUD Lines (compact: <= 76 visible chars)
+        local bottom_hud1 = string.format(
+            "  \27[1;33m[Slot %d: %s%s\27[1;33m]\27[0m \27[2;37m• [1-9] Change Block • [Enter/B] Dig • [P] Place\27[0m",
+            cur_slot, BLOCK_COLORS[cur_slot] or "", BLOCK_NAMES[cur_slot] or "Grass"
         )
-        local hud_bottom2 = "\r\27[2K\27[90m[W/A/S/D] Move │ [E/C] Fly │ [Arrows/J/L] Look │ [Enter/B] Dig │ [P] Place │ [1-9] Block │ [F] Sprint │ [Q] Quit\27[0m\27[K"
+        local bottom_hud2 = "  \27[2;37m[W/A/S/D] Move  [E/C] Fly  [Arrows/J/L] Look  [F] Sprint  [R] Reseed  [Q] Quit\27[0m"
 
-        io.write(hud_top .. "\r\n" .. frame_ansi .. "\r\n" .. hud_bottom1 .. "\r\n" .. hud_bottom2)
+        io.write("\27[H\r\27[2K" .. top_hud .. "\27[K\r\n" .. frame_ansi .. "\r\n\r\27[2K" .. bottom_hud1 .. "\27[K\r\n\r\27[2K" .. bottom_hud2 .. "\27[K")
         io.flush()
 
         frame_count = frame_count + 1
